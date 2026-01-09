@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alarm</title>
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --card: #ffffff;
+      --primary: #4a7c59;
+      --primary-light: #e8f0eb;
+      --accent: #7eb77f;
+      --text: #2d3748;
+      --text-muted: #718096;
+      --border: #e2e8f0;
+      --danger: #e57373;
+      --danger-light: #ffebee;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 24px 0 32px;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #3d6a4a;
+    }
+
+    .btn-icon {
+      background: transparent;
+      padding: 8px;
+      color: var(--text-muted);
+    }
+
+    .btn-icon:hover {
+      background: var(--danger-light);
+      color: var(--danger);
+    }
+
+    .alarm-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .alarm-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .alarm-item.ringing {
+      animation: ring 0.5s ease-in-out infinite alternate;
+      border: 2px solid var(--primary);
+    }
+
+    @keyframes ring {
+      from { transform: scale(1); }
+      to { transform: scale(1.02); }
+    }
+
+    .alarm-info h3 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .alarm-info p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .alarm-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 48px;
+      height: 28px;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 28px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      height: 22px;
+      width: 22px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+
+    .toggle input:checked + .toggle-slider {
+      background: var(--primary);
+    }
+
+    .toggle input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .notification-prompt {
+      background: var(--primary-light);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .notification-prompt p {
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+
+    .notification-prompt .btn {
+      background: var(--primary);
+      color: white;
+    }
+
+    .current-time {
+      font-size: 3rem;
+      font-weight: 300;
+      text-align: center;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .preset-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-preset {
+      flex: 1;
+      min-width: 60px;
+      padding: 12px 8px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-preset:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .btn-preset:active {
+      transform: scale(0.97);
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 20px 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .divider span {
+      padding: 0 12px;
+    }
+
+    .time-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .time-select {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1.25rem;
+      font-weight: 500;
+      text-align: center;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .time-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .time-colon {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .period-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .period-btn {
+      padding: 12px 14px;
+      border: none;
+      background: var(--bg);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .period-btn:first-child {
+      border-right: 1px solid var(--border);
+    }
+
+    .period-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .period-btn:not(.active):hover {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    .btn-dismiss {
+      background: var(--primary);
+      color: white;
+      padding: 10px 16px;
+    }
+
+    .btn-dismiss:hover {
+      background: #3d6a4a;
+    }
+
+    .btn-delete {
+      background: var(--danger-light);
+      color: var(--danger);
+      padding: 10px 16px;
+    }
+
+    .btn-delete:hover {
+      background: var(--danger);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.19.3';
+    import { useState, useEffect, useCallback } from 'https://esm.sh/preact@10.19.3/hooks';
+    import htm from 'https://esm.sh/htm@3.1.1';
+
+    const html = htm.bind(h);
+
+    // ============================================
+    // STORAGE BACKENDS (Modular - swap as needed)
+    // ============================================
+
+    const StorageBackends = {
+      // LocalStorage Backend
+      localStorage: {
+        name: 'localStorage',
+
+        async load(key) {
+          try {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : null;
+          } catch (e) {
+            console.error('localStorage load error:', e);
+            return null;
+          }
+        },
+
+        async save(key, data) {
+          try {
+            localStorage.setItem(key, JSON.stringify(data));
+            return true;
+          } catch (e) {
+            console.error('localStorage save error:', e);
+            return false;
+          }
+        },
+
+        async remove(key) {
+          localStorage.removeItem(key);
+          return true;
+        }
+      },
+
+      // File System Access API Backend (for future use)
+      fileSystem: {
+        name: 'fileSystem',
+        fileHandle: null,
+
+        async load(key) {
+          try {
+            if (!this.fileHandle) {
+              const handles = await window.showOpenFilePicker({
+                types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+              });
+              this.fileHandle = handles[0];
+            }
+            const file = await this.fileHandle.getFile();
+            const text = await file.text();
+            return JSON.parse(text);
+          } catch (e) {
+            console.error('fileSystem load error:', e);
+            return null;
+          }
+        },
+
+        async save(key, data) {
+          try {
+            if (!this.fileHandle) {
+              this.fileHandle = await window.showSaveFilePicker({
+                suggestedName: `${key}.json`,
+                types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
+              });
+            }
+            const writable = await this.fileHandle.createWritable();
+            await writable.write(JSON.stringify(data, null, 2));
+            await writable.close();
+            return true;
+          } catch (e) {
+            console.error('fileSystem save error:', e);
+            return false;
+          }
+        },
+
+        async remove(key) {
+          this.fileHandle = null;
+          return true;
+        }
+      },
+
+      // Solid Backend (placeholder for future)
+      solid: {
+        name: 'solid',
+        podUrl: null,
+
+        async load(key) {
+          // TODO: Implement Solid pod fetch
+          console.log('Solid backend not yet implemented');
+          return null;
+        },
+
+        async save(key, data) {
+          // TODO: Implement Solid pod save
+          console.log('Solid backend not yet implemented');
+          return false;
+        },
+
+        async remove(key) {
+          // TODO: Implement Solid pod delete
+          return false;
+        }
+      }
+    };
+
+    // ============================================
+    // STORAGE SERVICE (Abstraction Layer)
+    // ============================================
+
+    const createStorageService = (backend = StorageBackends.localStorage) => {
+      let currentBackend = backend;
+
+      return {
+        setBackend(newBackend) {
+          currentBackend = newBackend;
+        },
+
+        getBackendName() {
+          return currentBackend.name;
+        },
+
+        async loadAlarms() {
+          const data = await currentBackend.load('alarms');
+          return data || [];
+        },
+
+        async saveAlarms(alarms) {
+          return await currentBackend.save('alarms', alarms);
+        }
+      };
+    };
+
+    // ============================================
+    // NOTIFICATION SERVICE
+    // ============================================
+
+    const NotificationService = {
+      permission: Notification.permission,
+
+      async requestPermission() {
+        if (!('Notification' in window)) {
+          console.warn('Notifications not supported');
+          return false;
+        }
+        const permission = await Notification.requestPermission();
+        this.permission = permission;
+        return permission === 'granted';
+      },
+
+      hasPermission() {
+        return this.permission === 'granted';
+      },
+
+      notify(title, options = {}) {
+        if (!this.hasPermission()) return null;
+
+        return new Notification(title, {
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234a7c59"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>',
+          body: options.body || '',
+          tag: options.tag || 'alarm',
+          requireInteraction: true,
+          ...options
+        });
+      }
+    };
+
+    // ============================================
+    // AUDIO SERVICE
+    // ============================================
+
+    const AudioService = {
+      audioContext: null,
+      oscillator: null,
+      gainNode: null,
+
+      init() {
+        if (!this.audioContext) {
+          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      },
+
+      play() {
+        this.init();
+        if (this.oscillator) this.stop();
+
+        this.oscillator = this.audioContext.createOscillator();
+        this.gainNode = this.audioContext.createGain();
+
+        this.oscillator.connect(this.gainNode);
+        this.gainNode.connect(this.audioContext.destination);
+
+        this.oscillator.frequency.value = 800;
+        this.oscillator.type = 'sine';
+        this.gainNode.gain.value = 0.3;
+
+        this.oscillator.start();
+
+        // Beeping pattern
+        const beep = () => {
+          if (!this.oscillator) return;
+          this.gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+          this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 0.2);
+        };
+
+        this.beepInterval = setInterval(beep, 500);
+        beep();
+      },
+
+      stop() {
+        if (this.oscillator) {
+          this.oscillator.stop();
+          this.oscillator = null;
+        }
+        if (this.beepInterval) {
+          clearInterval(this.beepInterval);
+          this.beepInterval = null;
+        }
+      }
+    };
+
+    // ============================================
+    // ALARM SERVICE
+    // ============================================
+
+    const createAlarmService = (storageService) => {
+      let alarms = [];
+      let listeners = [];
+      let checkInterval = null;
+
+      const notify = () => listeners.forEach(fn => fn([...alarms]));
+
+      const formatTime = (hours, minutes) => {
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      };
+
+      const parseTime = (timeStr) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return { hours, minutes };
+      };
+
+      return {
+        subscribe(fn) {
+          listeners.push(fn);
+          return () => { listeners = listeners.filter(l => l !== fn); };
+        },
+
+        async init() {
+          alarms = await storageService.loadAlarms();
+          this.startChecking();
+          notify();
+        },
+
+        startChecking() {
+          if (checkInterval) return;
+          checkInterval = setInterval(() => this.checkAlarms(), 1000);
+        },
+
+        stopChecking() {
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
+        },
+
+        checkAlarms() {
+          const now = new Date();
+          const currentTime = formatTime(now.getHours(), now.getMinutes());
+          const currentSeconds = now.getSeconds();
+
+          alarms.forEach(alarm => {
+            if (alarm.enabled && alarm.time === currentTime && currentSeconds === 0 && !alarm.ringing) {
+              this.triggerAlarm(alarm.id);
+            }
+          });
+        },
+
+        triggerAlarm(id) {
+          const alarm = alarms.find(a => a.id === id);
+          if (!alarm) return;
+
+          alarm.ringing = true;
+          notify();
+
+          AudioService.play();
+          NotificationService.notify('Alarm!', {
+            body: alarm.label || alarm.time,
+            tag: `alarm-${id}`
+          });
+        },
+
+        async dismissAlarm(id) {
+          const alarm = alarms.find(a => a.id === id);
+          if (!alarm) return;
+
+          alarm.ringing = false;
+          // Keep enabled so it rings again tomorrow
+          AudioService.stop();
+
+          await storageService.saveAlarms(alarms);
+          notify();
+        },
+
+        async addAlarm(time, label = '') {
+          const newAlarm = {
+            id: Date.now().toString(),
+            time,
+            label,
+            enabled: true,
+            ringing: false,
+            createdAt: new Date().toISOString()
+          };
+
+          alarms.push(newAlarm);
+          await storageService.saveAlarms(alarms);
+          notify();
+          return newAlarm;
+        },
+
+        async removeAlarm(id) {
+          const alarm = alarms.find(a => a.id === id);
+          if (alarm?.ringing) AudioService.stop();
+
+          alarms = alarms.filter(a => a.id !== id);
+          await storageService.saveAlarms(alarms);
+          notify();
+        },
+
+        async toggleAlarm(id) {
+          const alarm = alarms.find(a => a.id === id);
+          if (!alarm) return;
+
+          if (alarm.ringing) {
+            this.dismissAlarm(id);
+            return;
+          }
+
+          alarm.enabled = !alarm.enabled;
+          await storageService.saveAlarms(alarms);
+          notify();
+        },
+
+        getAlarms() {
+          return [...alarms];
+        }
+      };
+    };
+
+    // ============================================
+    // INITIALIZE SERVICES
+    // ============================================
+
+    const storageService = createStorageService(StorageBackends.localStorage);
+    const alarmService = createAlarmService(storageService);
+
+    // ============================================
+    // UI COMPONENTS
+    // ============================================
+
+    const ClockIcon = () => html`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+      </svg>
+    `;
+
+    const DeleteIcon = () => html`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+      </svg>
+    `;
+
+    const CurrentTime = () => {
+      const [time, setTime] = useState(new Date());
+
+      useEffect(() => {
+        const interval = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const formatted = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      return html`<div class="current-time">${formatted}</div>`;
+    };
+
+    const NotificationPrompt = ({ onGrant }) => {
+      const handleClick = async () => {
+        const granted = await NotificationService.requestPermission();
+        if (granted) onGrant();
+      };
+
+      return html`
+        <div class="notification-prompt">
+          <p>Enable notifications to receive alarm alerts</p>
+          <button class="btn" onClick=${handleClick}>Enable Notifications</button>
+        </div>
+      `;
+    };
+
+    // ============================================
+    // TIME PARSING UTILITY
+    // ============================================
+
+    const TimeParser = {
+      parse(input) {
+        if (!input) return null;
+        const str = input.trim().toLowerCase();
+
+        // Try "HH:MM" or "H:MM" (24h or 12h without am/pm)
+        let match = str.match(/^(\d{1,2}):(\d{2})$/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          let m = parseInt(match[2], 10);
+          if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+            return this.format(h, m);
+          }
+        }
+
+        // Try "H:MM am/pm" or "HH:MM am/pm"
+        match = str.match(/^(\d{1,2}):(\d{2})\s*(am|pm|a|p)$/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          let m = parseInt(match[2], 10);
+          const period = match[3];
+          if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+            if (period.startsWith('p') && h !== 12) h += 12;
+            if (period.startsWith('a') && h === 12) h = 0;
+            return this.format(h, m);
+          }
+        }
+
+        // Try "HMM" or "HHMM" (e.g., "930" or "1430")
+        match = str.match(/^(\d{3,4})$/);
+        if (match) {
+          const num = match[1];
+          let h, m;
+          if (num.length === 3) {
+            h = parseInt(num[0], 10);
+            m = parseInt(num.slice(1), 10);
+          } else {
+            h = parseInt(num.slice(0, 2), 10);
+            m = parseInt(num.slice(2), 10);
+          }
+          if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+            return this.format(h, m);
+          }
+        }
+
+        // Try "HMMam/pm" or "HHMMam/pm" (e.g., "930am" or "1130pm")
+        match = str.match(/^(\d{3,4})\s*(am|pm|a|p)$/);
+        if (match) {
+          const num = match[1];
+          const period = match[2];
+          let h, m;
+          if (num.length === 3) {
+            h = parseInt(num[0], 10);
+            m = parseInt(num.slice(1), 10);
+          } else {
+            h = parseInt(num.slice(0, 2), 10);
+            m = parseInt(num.slice(2), 10);
+          }
+          if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+            if (period.startsWith('p') && h !== 12) h += 12;
+            if (period.startsWith('a') && h === 12) h = 0;
+            return this.format(h, m);
+          }
+        }
+
+        // Try just hour "H am/pm" or "HH am/pm"
+        match = str.match(/^(\d{1,2})\s*(am|pm|a|p)$/);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          const period = match[2];
+          if (h >= 1 && h <= 12) {
+            if (period.startsWith('p') && h !== 12) h += 12;
+            if (period.startsWith('a') && h === 12) h = 0;
+            return this.format(h, 0);
+          }
+        }
+
+        return null;
+      },
+
+      format(h, m) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      },
+
+      toDisplay(time24) {
+        if (!time24) return '';
+        const [h, m] = time24.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+      }
+    };
+
+    const AlarmForm = ({ onAdd }) => {
+      const [label, setLabel] = useState('');
+      const [hour, setHour] = useState(8);
+      const [minute, setMinute] = useState(0);
+      const [period, setPeriod] = useState('AM');
+
+      const addInMinutes = (minutes) => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + minutes);
+        const time = TimeParser.format(now.getHours(), now.getMinutes());
+        onAdd(time, label || `In ${minutes} min`);
+        setLabel('');
+      };
+
+      const addAtTime = () => {
+        let h = hour;
+        if (period === 'PM' && h !== 12) h += 12;
+        if (period === 'AM' && h === 12) h = 0;
+        const time = TimeParser.format(h, minute);
+        onAdd(time, label);
+        setLabel('');
+      };
+
+      const presets = [
+        { label: '1 min', minutes: 1 },
+        { label: '5 min', minutes: 5 },
+        { label: '10 min', minutes: 10 },
+        { label: '30 min', minutes: 30 },
+        { label: '1 hour', minutes: 60 },
+      ];
+
+      const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+      return html`
+        <div class="card">
+          <div class="form-group">
+            <label>Quick alarm</label>
+            <div class="preset-buttons">
+              ${presets.map(p => html`
+                <button
+                  type="button"
+                  class="btn-preset"
+                  onClick=${() => addInMinutes(p.minutes)}
+                >
+                  ${p.label}
+                </button>
+              `)}
+            </div>
+          </div>
+
+          <div class="divider">
+            <span>or set specific time</span>
+          </div>
+
+          <div class="form-group">
+            <label>Time</label>
+            <div class="time-picker">
+              <select
+                class="time-select"
+                value=${hour}
+                onChange=${(e) => setHour(parseInt(e.target.value))}
+              >
+                ${hours.map(h => html`<option value=${h}>${h}</option>`)}
+              </select>
+              <span class="time-colon">:</span>
+              <select
+                class="time-select"
+                value=${minute}
+                onChange=${(e) => setMinute(parseInt(e.target.value))}
+              >
+                ${minutes.map(m => html`<option value=${m}>${String(m).padStart(2, '0')}</option>`)}
+              </select>
+              <div class="period-toggle">
+                <button
+                  type="button"
+                  class=${`period-btn ${period === 'AM' ? 'active' : ''}`}
+                  onClick=${() => setPeriod('AM')}
+                >AM</button>
+                <button
+                  type="button"
+                  class=${`period-btn ${period === 'PM' ? 'active' : ''}`}
+                  onClick=${() => setPeriod('PM')}
+                >PM</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Label (optional)</label>
+            <input
+              type="text"
+              value=${label}
+              onInput=${(e) => setLabel(e.target.value)}
+              placeholder="Wake up, Meeting, etc."
+            />
+          </div>
+
+          <button type="button" class="btn btn-primary" onClick=${addAtTime}>
+            Set Alarm
+          </button>
+        </div>
+      `;
+    };
+
+    const AlarmItem = ({ alarm, onToggle, onDelete, onDismiss }) => {
+      return html`
+        <div class="alarm-item ${alarm.ringing ? 'ringing' : ''}">
+          <div class="alarm-info">
+            <h3>${TimeParser.toDisplay(alarm.time)}</h3>
+            <p>${alarm.label || 'Alarm'}</p>
+          </div>
+          <div class="alarm-actions">
+            ${alarm.ringing ? html`
+              <button class="btn btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
+                Dismiss
+              </button>
+              <button class="btn btn-delete" onClick=${() => onDelete(alarm.id)}>
+                Delete
+              </button>
+            ` : html`
+              <label class="toggle">
+                <input
+                  type="checkbox"
+                  checked=${alarm.enabled}
+                  onChange=${() => onToggle(alarm.id)}
+                />
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn btn-icon" onClick=${() => onDelete(alarm.id)}>
+                <${DeleteIcon} />
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    };
+
+    const EmptyState = () => html`
+      <div class="empty-state">
+        <${ClockIcon} />
+        <p>No alarms yet</p>
+        <p>Add your first alarm above</p>
+      </div>
+    `;
+
+    const App = () => {
+      const [alarms, setAlarms] = useState([]);
+      const [showNotificationPrompt, setShowNotificationPrompt] = useState(
+        !NotificationService.hasPermission()
+      );
+
+      useEffect(() => {
+        alarmService.init();
+        const unsubscribe = alarmService.subscribe(setAlarms);
+        return () => {
+          unsubscribe();
+          alarmService.stopChecking();
+        };
+      }, []);
+
+      const handleAddAlarm = useCallback((time, label) => {
+        alarmService.addAlarm(time, label);
+      }, []);
+
+      const handleToggle = useCallback((id) => {
+        alarmService.toggleAlarm(id);
+      }, []);
+
+      const handleDelete = useCallback((id) => {
+        alarmService.removeAlarm(id);
+      }, []);
+
+      const handleDismiss = useCallback((id) => {
+        alarmService.dismissAlarm(id);
+      }, []);
+
+      const sortedAlarms = [...alarms].sort((a, b) => a.time.localeCompare(b.time));
+
+      return html`
+        <div class="container">
+          <header>
+            <h1>Alarm</h1>
+            <p>Simple & Beautiful</p>
+          </header>
+
+          <${CurrentTime} />
+
+          ${showNotificationPrompt && html`
+            <${NotificationPrompt} onGrant=${() => setShowNotificationPrompt(false)} />
+          `}
+
+          <${AlarmForm} onAdd=${handleAddAlarm} />
+
+          <div class="alarm-list">
+            ${sortedAlarms.length === 0
+              ? html`<${EmptyState} />`
+              : sortedAlarms.map(alarm => html`
+                  <${AlarmItem}
+                    key=${alarm.id}
+                    alarm=${alarm}
+                    onToggle=${handleToggle}
+                    onDelete=${handleDelete}
+                    onDismiss=${handleDismiss}
+                  />
+                `)
+            }
+          </div>
+        </div>
+      `;
+    };
+
+    // ============================================
+    // RENDER
+    // ============================================
+
+    render(html`<${App} />`, document.getElementById('app'));
+
+    // Expose services for debugging/extension
+    window.AlarmApp = {
+      storageService,
+      alarmService,
+      NotificationService,
+      AudioService,
+      StorageBackends
+    };
+  </script>
+</body>
+</html>

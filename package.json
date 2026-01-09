@@ -1,0 +1,32 @@
+{
+  "name": "solid-alarm",
+  "version": "0.0.1",
+  "description": "Simple & beautiful alarm clock web app with modular storage backends",
+  "license": "AGPL-3.0-only",
+  "author": "solid-apps",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/solid-apps/alarm"
+  },
+  "homepage": "https://solid-apps.github.io/alarm",
+  "keywords": [
+    "alarm",
+    "clock",
+    "timer",
+    "pwa",
+    "solid",
+    "preact"
+  ],
+  "type": "module",
+  "main": "index.html",
+  "files": [
+    "index.html"
+  ],
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
