@@ -380,6 +380,7 @@
       color: white;
     }
   </style>
+  <script src="https://unpkg.com/xlogin"></script>
 </head>
 <body>
   <div id="app"></div>
@@ -472,26 +473,127 @@
         }
       },
 
-      // Solid Backend (placeholder for future)
+      // Solid Backend — stores alarms as JSON-LD on the user's pod.
+      // PoC layout: /public/alarm/alarms.jsonld with public read+write ACL
+      // so the same pattern as the PDF reader's remote-control state doc
+      // works (curl can add/remove an alarm, etc.). For sensitive use the
+      // ACL can be tightened to owner-only later.
       solid: {
         name: 'solid',
-        podUrl: null,
+        docUrl: null,      // resolved on first call from xlogin's WebID
+        aclUrl: null,
+        seeded: false,
+        wsUrl: null,
+        lastWritten: null, // dedupe key for echo-loop prevention
+
+        async resolveDoc() {
+          if (this.docUrl) return this.docUrl;
+          const xl = window.xlogin;
+          if (!xl || xl.type !== 'solid' || !xl.id) return null;
+          const origin = new URL(xl.id).origin;
+          this.docUrl = origin + '/public/alarm/alarms.jsonld';
+          this.aclUrl = this.docUrl + '.acl';
+          return this.docUrl;
+        },
+
+        async ensureSeeded() {
+          if (this.seeded) return;
+          const url = await this.resolveDoc();
+          if (!url) return;
+          this.seeded = true;
+          // Seed the doc if missing
+          try {
+            const r = await window.xlogin.authFetch(url, { method: 'HEAD' });
+            if (!r.ok) {
+              await window.xlogin.authFetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/ld+json' },
+                body: JSON.stringify(this._emptyDoc())
+              });
+            }
+          } catch {}
+          // Seed the ACL if missing (JSS is JSON-LD-first; ACL must be JSON-LD)
+          try {
+            const r = await window.xlogin.authFetch(this.aclUrl, { method: 'HEAD' });
+            if (!r.ok) {
+              await window.xlogin.authFetch(this.aclUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/ld+json' },
+                body: JSON.stringify({
+                  '@context': {
+                    'acl': 'http://www.w3.org/ns/auth/acl#',
+                    'foaf': 'http://xmlns.com/foaf/0.1/'
+                  },
+                  '@graph': [
+                    { '@id': '#owner', '@type': 'acl:Authorization',
+                      'acl:agent': { '@id': '/profile/card.jsonld#me' },
+                      'acl:accessTo': { '@id': 'alarms.jsonld' },
+                      'acl:mode': [{'@id':'acl:Read'},{'@id':'acl:Write'},{'@id':'acl:Control'}] },
+                    { '@id': '#public', '@type': 'acl:Authorization',
+                      'acl:agentClass': { '@id': 'foaf:Agent' },
+                      'acl:accessTo': { '@id': 'alarms.jsonld' },
+                      'acl:mode': [{'@id':'acl:Read'},{'@id':'acl:Write'}] }
+                  ]
+                })
+              });
+            }
+          } catch {}
+        },
+
+        _emptyDoc() {
+          return {
+            '@context': { 'schema': 'https://schema.org/' },
+            '@id': '#alarms',
+            '@type': 'schema:ItemList',
+            'schema:dateModified': new Date().toISOString(),
+            'schema:itemListElement': []
+          };
+        },
 
         async load(key) {
-          // TODO: Implement Solid pod fetch
-          console.log('Solid backend not yet implemented');
-          return null;
+          const url = await this.resolveDoc();
+          if (!url) return null;
+          await this.ensureSeeded();
+          try {
+            const r = await window.xlogin.authFetch(url, { cache: 'no-store' });
+            if (!r.ok) return null;
+            const doc = await r.json();
+            return doc['schema:itemListElement'] || [];
+          } catch (e) {
+            console.error('solid load error:', e);
+            return null;
+          }
         },
 
         async save(key, data) {
-          // TODO: Implement Solid pod save
-          console.log('Solid backend not yet implemented');
-          return false;
+          const url = await this.resolveDoc();
+          if (!url) return false;
+          await this.ensureSeeded();
+          // Dedupe identical content (prevents echo loop when WS fires from our own write)
+          const fingerprint = JSON.stringify(data);
+          if (fingerprint === this.lastWritten) return true;
+          this.lastWritten = fingerprint;
+          try {
+            const body = JSON.stringify({
+              ...this._emptyDoc(),
+              'schema:dateModified': new Date().toISOString(),
+              'schema:itemListElement': data
+            });
+            const r = await window.xlogin.authFetch(url, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/ld+json' },
+              body
+            });
+            return r.ok;
+          } catch (e) {
+            console.error('solid save error:', e);
+            return false;
+          }
         },
 
         async remove(key) {
-          // TODO: Implement Solid pod delete
-          return false;
+          // "Remove" means empty the doc (don't DELETE — keeps the ACL).
+          return this.save(key, []);
         }
       }
     };
@@ -643,6 +745,13 @@
           notify();
         },
 
+        // Re-load from the current backend (used after backend switch or
+        // when an external change is delivered via WebSocket notification).
+        async reload() {
+          alarms = await storageService.loadAlarms();
+          notify();
+        },
+
         startChecking() {
           if (checkInterval) return;
           checkInterval = setInterval(() => this.checkAlarms(), 1000);
@@ -744,6 +853,87 @@
 
     const storageService = createStorageService(StorageBackends.localStorage);
     const alarmService = createAlarmService(storageService);
+
+    // ============================================
+    // SOLID INTEGRATION
+    // ============================================
+    // - Auto-switch backend on xlogin sign-in/out
+    // - One-way migration of localStorage → pod on first sign-in
+    // - Live sync via JSS's legacy `solid-0.1` WebSocket so external
+    //   writes (other device, CLI, curl) refresh the UI
+
+    let solidWs = null;
+    let solidWsBackoff = 500;
+
+    function closeSolidWs() {
+      if (solidWs) { try { solidWs.close(); } catch {} solidWs = null; }
+    }
+
+    async function subscribeSolidWs() {
+      closeSolidWs();
+      const url = await StorageBackends.solid.resolveDoc();
+      if (!url) return;
+      let r;
+      try { r = await fetch(url); } catch { return; }
+      const wsUrl = r.headers.get('updates-via');
+      if (!wsUrl) return;
+      const connect = () => {
+        const ws = new WebSocket(wsUrl);
+        solidWs = ws;
+        ws.onopen = () => { solidWsBackoff = 500; ws.send('sub ' + url); };
+        ws.onmessage = async (e) => {
+          if (typeof e.data === 'string' && e.data.startsWith('pub ')) {
+            await alarmService.reload();
+          }
+        };
+        ws.onclose = () => {
+          if (solidWs === ws) {
+            solidWs = null;
+            setTimeout(connect, solidWsBackoff = Math.min(solidWsBackoff * 2, 10000));
+          }
+        };
+        ws.onerror = () => ws.close();
+      };
+      connect();
+    }
+
+    async function migrateLocalToSolid() {
+      const local = await StorageBackends.localStorage.load('alarms');
+      if (!local || !local.length) return;
+      const pod = await StorageBackends.solid.load('alarms');
+      if (pod && pod.length) return; // pod has data; don't clobber
+      await StorageBackends.solid.save('alarms', local);
+      console.log(`migrated ${local.length} alarms from localStorage to pod`);
+    }
+
+    async function onSolidSignIn() {
+      await migrateLocalToSolid();
+      storageService.setBackend(StorageBackends.solid);
+      await alarmService.reload();
+      await subscribeSolidWs();
+    }
+
+    async function onSolidSignOut() {
+      // Reset the solid backend so a future sign-in re-resolves cleanly
+      StorageBackends.solid.docUrl = null;
+      StorageBackends.solid.aclUrl = null;
+      StorageBackends.solid.seeded = false;
+      StorageBackends.solid.lastWritten = null;
+      closeSolidWs();
+      storageService.setBackend(StorageBackends.localStorage);
+      await alarmService.reload();
+    }
+
+    document.addEventListener('xlogin', (e) => {
+      if (e.detail?.type === 'solid') onSolidSignIn();
+    });
+    document.addEventListener('xlogout', () => onSolidSignOut());
+
+    // xlogin may have already restored a session before this handler
+    // attached — pick that up too.
+    if (window.xlogin && window.xlogin.type === 'solid' && window.xlogin.id) {
+      onSolidSignIn();
+    }
 
     // ============================================
     // UI COMPONENTS
