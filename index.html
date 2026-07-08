@@ -632,7 +632,10 @@
     // ============================================
 
     const NotificationService = {
-      permission: Notification.permission,
+      // Guard: Notification is undefined on browsers without the API (e.g.
+      // iOS Safari outside an installed PWA). Reading it unguarded here throws
+      // at module load and blanks the whole app.
+      permission: ('Notification' in window) ? Notification.permission : 'denied',
 
       async requestPermission() {
         if (!('Notification' in window)) {
@@ -723,6 +726,7 @@
       let alarms = [];
       let listeners = [];
       let checkInterval = null;
+      const lastFiredMinute = new Map(); // alarm.id -> minute epoch it last fired
 
       const notify = () => listeners.forEach(fn => fn([...alarms]));
 
@@ -769,10 +773,18 @@
         checkAlarms() {
           const now = new Date();
           const currentTime = formatTime(now.getHours(), now.getMinutes());
-          const currentSeconds = now.getSeconds();
+          // Fire once when the clock reaches the alarm's minute. Guarding on
+          // the minute rather than seconds===0 means a background-throttled
+          // tick (browsers clamp inactive-tab intervals to >=1/min) that skips
+          // second 0 still fires the alarm. minuteKey is unique per calendar
+          // minute, so it fires again the next day and never twice in one
+          // minute (even if dismissed mid-minute).
+          const minuteKey = Math.floor(now.getTime() / 60000);
 
           alarms.forEach(alarm => {
-            if (alarm.enabled && alarm.time === currentTime && currentSeconds === 0 && !alarm.ringing) {
+            if (alarm.enabled && alarm.time === currentTime && !alarm.ringing &&
+                lastFiredMinute.get(alarm.id) !== minuteKey) {
+              lastFiredMinute.set(alarm.id, minuteKey);
               this.triggerAlarm(alarm.id);
             }
           });
