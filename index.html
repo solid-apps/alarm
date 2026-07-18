@@ -152,6 +152,12 @@
       to { transform: scale(1.02); }
     }
 
+    .alarm-info {
+      flex: 1;
+      min-width: 0;
+      padding-right: 12px;
+    }
+
     .alarm-info h3 {
       font-size: 1.5rem;
       font-weight: 600;
@@ -161,11 +167,16 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .alarm-actions {
       display: flex;
+      align-items: center;
       gap: 4px;
+      flex-shrink: 0;
     }
 
     .toggle {
@@ -382,6 +393,24 @@
     .btn-delete:hover {
       background: var(--danger);
       color: white;
+    }
+
+    button:focus-visible,
+    .time-select:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .toggle input:focus-visible + .toggle-slider {
+      box-shadow: 0 0 0 3px var(--primary-light), 0 0 0 4px var(--primary);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
   <script src="https://unpkg.com/xlogin"></script>
@@ -681,6 +710,11 @@
 
       play() {
         this.init();
+        // The context is created from a timer (no user gesture), so Chrome
+        // starts it suspended and the beep would be silent without a resume.
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume().catch(() => {});
+        }
         if (this.oscillator) this.stop();
 
         this.oscillator = this.audioContext.createOscillator();
@@ -809,8 +843,9 @@
           if (!alarm) return;
 
           alarm.ringing = false;
-          // Keep enabled so it rings again tomorrow
-          AudioService.stop();
+          // Keep enabled so it rings again tomorrow.
+          // Only silence the beep if no other alarm is still ringing.
+          if (!alarms.some(a => a.ringing)) AudioService.stop();
 
           await storageService.saveAlarms(alarms);
           notify();
@@ -834,9 +869,8 @@
 
         async removeAlarm(id) {
           const alarm = alarms.find(a => a.id === id);
-          if (alarm?.ringing) AudioService.stop();
-
           alarms = alarms.filter(a => a.id !== id);
+          if (alarm?.ringing && !alarms.some(a => a.ringing)) AudioService.stop();
           await storageService.saveAlarms(alarms);
           notify();
         },
@@ -868,6 +902,12 @@
     const storageService = createStorageService(StorageBackends.localStorage);
     const alarmService = createAlarmService(storageService);
 
+    // Background tabs get their intervals clamped, so a due alarm can ring
+    // late; check immediately whenever the tab becomes visible again.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) alarmService.checkAlarms();
+    });
+
     // ============================================
     // SOLID INTEGRATION
     // ============================================
@@ -878,8 +918,10 @@
 
     let solidWs = null;
     let solidWsBackoff = 500;
+    let solidWsRetryTimer = null;
 
     function closeSolidWs() {
+      if (solidWsRetryTimer) { clearTimeout(solidWsRetryTimer); solidWsRetryTimer = null; }
       if (solidWs) { try { solidWs.close(); } catch {} solidWs = null; }
     }
 
@@ -903,7 +945,7 @@
         ws.onclose = () => {
           if (solidWs === ws) {
             solidWs = null;
-            setTimeout(connect, solidWsBackoff = Math.min(solidWsBackoff * 2, 10000));
+            solidWsRetryTimer = setTimeout(connect, solidWsBackoff = Math.min(solidWsBackoff * 2, 10000));
           }
         };
         ws.onerror = () => ws.close();
@@ -978,16 +1020,18 @@
       return html`<div class="current-time">${formatted}</div>`;
     };
 
-    const NotificationPrompt = ({ onGrant }) => {
+    const NotificationPrompt = ({ onDone }) => {
       const handleClick = async () => {
-        const granted = await NotificationService.requestPermission();
-        if (granted) onGrant();
+        await NotificationService.requestPermission();
+        // Hide the prompt once the user has answered either way — if they
+        // denied, asking again from this button can never succeed.
+        if (NotificationService.permission !== 'default') onDone();
       };
 
       return html`
         <div class="notification-prompt">
           <p>Enable notifications to receive alarm alerts</p>
-          <button class="btn" onClick=${handleClick}>Enable Notifications</button>
+          <button type="button" class="btn" onClick=${handleClick}>Enable Notifications</button>
         </div>
       `;
     };
@@ -1149,6 +1193,7 @@
             <div class="time-picker">
               <select
                 class="time-select"
+                aria-label="Hour"
                 value=${hour}
                 onChange=${(e) => setHour(parseInt(e.target.value))}
               >
@@ -1157,6 +1202,7 @@
               <span class="time-colon">:</span>
               <select
                 class="time-select"
+                aria-label="Minute"
                 value=${minute}
                 onChange=${(e) => setMinute(parseInt(e.target.value))}
               >
@@ -1183,6 +1229,7 @@
               type="text"
               value=${label}
               onInput=${(e) => setLabel(e.target.value)}
+              onKeyDown=${(e) => { if (e.key === 'Enter') addAtTime(); }}
               placeholder="Wake up, Meeting, etc."
             />
           </div>
@@ -1215,10 +1262,16 @@
                   type="checkbox"
                   checked=${alarm.enabled}
                   onChange=${() => onToggle(alarm.id)}
+                  aria-label="Enable alarm ${TimeParser.toDisplay(alarm.time)}"
                 />
                 <span class="toggle-slider"></span>
               </label>
-              <button class="btn btn-icon" onClick=${() => onDelete(alarm.id)}>
+              <button
+                type="button"
+                class="btn btn-icon"
+                aria-label="Delete alarm ${TimeParser.toDisplay(alarm.time)}"
+                onClick=${() => onDelete(alarm.id)}
+              >
                 <${DeleteIcon} />
               </button>
             `}
@@ -1237,8 +1290,11 @@
 
     const App = () => {
       const [alarms, setAlarms] = useState([]);
+      // Only prompt when the API exists and the user hasn't already decided:
+      // with permission 'denied' (or no Notification API at all) the button
+      // could never do anything.
       const [showNotificationPrompt, setShowNotificationPrompt] = useState(
-        !NotificationService.hasPermission()
+        ('Notification' in window) && NotificationService.permission === 'default'
       );
 
       useEffect(() => {
@@ -1278,7 +1334,7 @@
           <${CurrentTime} />
 
           ${showNotificationPrompt && html`
-            <${NotificationPrompt} onGrant=${() => setShowNotificationPrompt(false)} />
+            <${NotificationPrompt} onDone=${() => setShowNotificationPrompt(false)} />
           `}
 
           <${AlarmForm} onAdd=${handleAddAlarm} />
