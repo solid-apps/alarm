@@ -915,6 +915,7 @@
         wsUrl: null,
         lastWritten: null, // dedupe key for echo-loop prevention
         loadFailed: false, // latch: a failed load blocks saves until a load succeeds
+        foreign: null,     // non-alarm components seen on load, carried through saves
 
         async resolveDoc() {
           if (this.docUrl) return this.docUrl;
@@ -976,13 +977,78 @@
           } catch {}
         },
 
+        // ---- iCal data model ------------------------------------------
+        // The pod doc is an ical:Vcalendar of ical:Vevent components — the
+        // same shape (and aliased-context style) the sibling calendar and
+        // tasks apps use, so any Vcalendar-aware tool can read alarms as
+        // what they are. Each alarm is a daily-recurring Vevent:
+        //   time    -> dtstart (floating time — RFC 5545's "8am wherever
+        //              you are" semantics, which is what an alarm wants)
+        //   (daily) -> rrule FREQ=DAILY (weekday schedules later = BYDAY)
+        //   label   -> summary
+        //   enabled -> status CONFIRMED / CANCELLED (a calendar hiding
+        //              CANCELLED events treats a disabled alarm correctly)
+        //   + an embedded ical:Valarm — RFC 5545's actual alarm construct,
+        //     marking the event as one that rings.
+        // Components are dual-typed with urn:solid:Alarm for catalog
+        // discovery (registry: urn-solid.com). The in-memory/localStorage
+        // shape is unchanged; all mapping happens at this boundary.
+        _context() {
+          return {
+            ical: 'http://www.w3.org/2002/12/cal/ical#',
+            dct: 'http://purl.org/dc/terms/',
+            summary: 'ical:summary', dtstart: 'ical:dtstart', rrule: 'ical:rrule',
+            status: 'ical:status', created: 'dct:created', modified: 'dct:modified',
+            component: 'ical:component', valarm: 'ical:valarm',
+            action: 'ical:action', trigger: 'ical:trigger', name: 'dct:title',
+            Vcalendar: 'ical:Vcalendar', Vevent: 'ical:Vevent', Valarm: 'ical:Valarm'
+          };
+        },
+
         _emptyDoc() {
           return {
-            '@context': { 'schema': 'https://schema.org/' },
-            '@id': '#alarms',
-            '@type': 'schema:ItemList',
-            'schema:dateModified': new Date().toISOString(),
-            'schema:itemListElement': []
+            '@context': this._context(),
+            '@id': '#this',
+            '@type': 'Vcalendar',
+            name: 'Alarms',
+            modified: new Date().toISOString(),
+            component: []
+          };
+        },
+
+        // Ours vs foreign: alarm components carry the urn:solid:Alarm type
+        // (full IRI in @type so estate-style string matchers find it too).
+        _isAlarm(c) {
+          const types = [].concat((c && c['@type']) || []);
+          return types.includes('urn:solid:Alarm') ||
+                 String((c && c['@id']) || '').startsWith('#alarm-');
+        },
+
+        _toComponent(a) {
+          const comp = {
+            '@id': '#alarm-' + a.id,
+            '@type': ['Vevent', 'urn:solid:Alarm'],
+            dtstart: (a.createdAt || new Date().toISOString()).slice(0, 10) + 'T' + a.time,
+            rrule: 'FREQ=DAILY',
+            status: a.enabled ? 'CONFIRMED' : 'CANCELLED',
+            valarm: { '@type': 'Valarm', action: 'AUDIO', trigger: 'PT0S' }
+          };
+          if (a.label) comp.summary = a.label;
+          if (a.createdAt) comp.created = a.createdAt;
+          return comp;
+        },
+
+        _fromComponent(c) {
+          const frag = String(c['@id'] || '');
+          const time = String(c.dtstart || '').slice(11, 16);
+          return {
+            id: frag.startsWith('#alarm-') ? frag.slice(7)
+              : (frag.replace(/^#/, '') || Date.now().toString()),
+            time: /^\d\d:\d\d$/.test(time) ? time : '00:00',
+            label: c.summary || '',
+            enabled: c.status !== 'CANCELLED',
+            ringing: false,
+            createdAt: c.created || new Date().toISOString()
           };
         },
 
@@ -1002,10 +1068,22 @@
             return null;
           }
           this.loadFailed = false;
-          if (r.missing) return [];
+          if (r.missing) { this.foreign = []; return []; }
           try {
             const doc = JSON.parse(r.text);
-            return doc['schema:itemListElement'] || [];
+            // Legacy format (pre-iCal): schema:ItemList of raw app objects.
+            // Read it once; the next save upgrades the doc in place.
+            if (doc['schema:itemListElement']) {
+              this.foreign = [];
+              return doc['schema:itemListElement'] || [];
+            }
+            const comps = Array.isArray(doc.component) ? doc.component
+              : (doc.component ? [doc.component] : []);
+            // Preserve components we didn't write (another app may share the
+            // calendar doc) — save() carries them through instead of
+            // rebuilding the doc from scratch.
+            this.foreign = comps.filter(c => !this._isAlarm(c));
+            return comps.filter(c => this._isAlarm(c)).map(c => this._fromComponent(c));
           } catch (e) {
             console.error('solid load: unparseable doc:', e);
             this.loadFailed = true;
@@ -1032,9 +1110,11 @@
           try {
             const body = JSON.stringify({
               ...this._emptyDoc(),
-              'schema:dateModified': new Date().toISOString(),
-              'schema:itemListElement': data
-            });
+              component: [
+                ...data.map(a => this._toComponent(a)),
+                ...(this.foreign || [])
+              ]
+            }, null, 2);
             const r = await window.xlogin.authFetch(url, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/ld+json' },
@@ -1072,12 +1152,18 @@
 
         // null propagates: it means the load FAILED, and callers keep their
         // current in-memory state rather than treating the store as empty.
+        // `ringing` is session state, not data — it is stripped on save and
+        // forced false on load so a stale flag can never travel between
+        // devices (phantom "Dismiss" rows) or survive a reload.
         async loadAlarms() {
-          return await currentBackend.load('alarms');
+          const data = await currentBackend.load('alarms');
+          if (data === null) return null;
+          return data.map(a => ({ ...a, ringing: false }));
         },
 
         async saveAlarms(alarms) {
-          return await currentBackend.save('alarms', alarms);
+          return await currentBackend.save('alarms',
+            alarms.map(({ ringing, ...a }) => a));
         }
       };
     };
@@ -1417,6 +1503,7 @@
       StorageBackends.solid.seeded = false;
       StorageBackends.solid.lastWritten = null;
       StorageBackends.solid.loadFailed = false;
+      StorageBackends.solid.foreign = null;
       closeSolidWs();
       storageService.setBackend(StorageBackends.localStorage);
       await alarmService.reload();
