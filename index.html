@@ -823,13 +823,17 @@
 
     const StorageBackends = {
       // LocalStorage Backend
+      // Backend load() contract (all backends): the resolved value is the
+      // data, [] when the store is definitely empty/missing, and null ONLY
+      // when the load FAILED. Callers must never treat null as "empty" —
+      // a failed load must not lead to overwriting the remote store.
       localStorage: {
         name: 'localStorage',
 
         async load(key) {
           try {
             const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : null;
+            return data === null ? [] : JSON.parse(data);
           } catch (e) {
             console.error('localStorage load error:', e);
             return null;
@@ -910,6 +914,7 @@
         seeded: false,
         wsUrl: null,
         lastWritten: null, // dedupe key for echo-loop prevention
+        loadFailed: false, // latch: a failed load blocks saves until a load succeeds
 
         async resolveDoc() {
           if (this.docUrl) return this.docUrl;
@@ -925,22 +930,30 @@
           if (this.seeded) return;
           const url = await this.resolveDoc();
           if (!url) return;
-          this.seeded = true;
-          // Seed the doc if missing
+          // Seed ONLY on a definite 404/410. Any other non-OK status (500,
+          // 429, expired-token 401/403) is a transient failure — PUTting the
+          // empty doc over it would destroy the user's alarms. Leave
+          // `seeded` unset on failure so the next call retries.
           try {
             const r = await window.xlogin.authFetch(url, { method: 'HEAD' });
-            if (!r.ok) {
-              await window.xlogin.authFetch(url, {
+            if (r.status === 404 || r.status === 410) {
+              const put = await window.xlogin.authFetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/ld+json' },
                 body: JSON.stringify(this._emptyDoc())
               });
+              if (!put.ok) return;
+            } else if (!r.ok) {
+              return;
             }
-          } catch {}
-          // Seed the ACL if missing (JSS is JSON-LD-first; ACL must be JSON-LD)
+          } catch { return; }
+          this.seeded = true;
+          // Seed the ACL if missing (JSS is JSON-LD-first; ACL must be JSON-LD).
+          // Same rule: only a definite 404/410 may be seeded — overwriting on
+          // a transient error could reset a customized ACL.
           try {
             const r = await window.xlogin.authFetch(this.aclUrl, { method: 'HEAD' });
-            if (!r.ok) {
+            if (r.status === 404 || r.status === 410) {
               await window.xlogin.authFetch(this.aclUrl, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/ld+json' },
@@ -977,13 +990,25 @@
           const url = await this.resolveDoc();
           if (!url) return null;
           await this.ensureSeeded();
+          // SolidKit.loadDoc never conflates missing with failed: only a
+          // definite 404/410 comes back as `missing`. An unparseable body is
+          // a failure too — parse errors were overwriting real documents in
+          // the wild (see kit docs).
+          const r = await SolidKit.loadDoc(
+            (u, init) => window.xlogin.authFetch(u, init), url, { cache: 'no-store' });
+          if (!r.ok) {
+            console.error('solid load failed:', r.status, r.error);
+            this.loadFailed = true;
+            return null;
+          }
+          this.loadFailed = false;
+          if (r.missing) return [];
           try {
-            const r = await window.xlogin.authFetch(url, { cache: 'no-store' });
-            if (!r.ok) return null;
-            const doc = await r.json();
+            const doc = JSON.parse(r.text);
             return doc['schema:itemListElement'] || [];
           } catch (e) {
-            console.error('solid load error:', e);
+            console.error('solid load: unparseable doc:', e);
+            this.loadFailed = true;
             return null;
           }
         },
@@ -991,6 +1016,14 @@
         async save(key, data) {
           const url = await this.resolveDoc();
           if (!url) return false;
+          // Estate rule from the kit: a failed load MUST block subsequent
+          // saves — the in-memory state may be stale or empty, and writing
+          // it out would overwrite the remote document. A later successful
+          // load() clears the latch.
+          if (this.loadFailed) {
+            console.error('solid save blocked: last load failed');
+            return false;
+          }
           await this.ensureSeeded();
           // Dedupe identical content (prevents echo loop when WS fires from our own write)
           const fingerprint = JSON.stringify(data);
@@ -1037,9 +1070,10 @@
           return currentBackend.name;
         },
 
+        // null propagates: it means the load FAILED, and callers keep their
+        // current in-memory state rather than treating the store as empty.
         async loadAlarms() {
-          const data = await currentBackend.load('alarms');
-          return data || [];
+          return await currentBackend.load('alarms');
         },
 
         async saveAlarms(alarms) {
@@ -1172,15 +1206,23 @@
         },
 
         async init() {
-          alarms = await storageService.loadAlarms();
+          const data = await storageService.loadAlarms();
+          if (data !== null) alarms = data; // failed load: keep the empty default
           this.startChecking();
           notify();
         },
 
         // Re-load from the current backend (used after backend switch or
         // when an external change is delivered via WebSocket notification).
+        // A failed load keeps the current in-memory alarms — showing stale
+        // data beats showing (and later persisting) an empty list.
         async reload() {
-          alarms = await storageService.loadAlarms();
+          const data = await storageService.loadAlarms();
+          if (data === null) {
+            toast("Couldn't sync alarms — keeping the current list", { error: true });
+            return;
+          }
+          alarms = data;
           notify();
         },
 
@@ -1349,7 +1391,14 @@
       const local = await StorageBackends.localStorage.load('alarms');
       if (!local || !local.length) return;
       const pod = await StorageBackends.solid.load('alarms');
-      if (pod && pod.length) return; // pod has data; don't clobber
+      // null = the load FAILED (not "pod is empty") — we cannot know whether
+      // the pod has data, so migrating would risk clobbering it. Abort; the
+      // next sign-in retries.
+      if (pod === null) {
+        console.error('migration skipped: could not read pod state');
+        return;
+      }
+      if (pod.length) return; // pod has data; don't clobber
       await StorageBackends.solid.save('alarms', local);
       console.log(`migrated ${local.length} alarms from localStorage to pod`);
     }
@@ -1367,6 +1416,7 @@
       StorageBackends.solid.aclUrl = null;
       StorageBackends.solid.seeded = false;
       StorageBackends.solid.lastWritten = null;
+      StorageBackends.solid.loadFailed = false;
       closeSolidWs();
       storageService.setBackend(StorageBackends.localStorage);
       await alarmService.reload();
