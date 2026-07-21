@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="theme-color" content="#fbbf24">
+  <meta name="theme-color" content="#f2f4f8">
   <style>
 /* SolidKit v1.0 vendored — do not edit; canonical: solid-apps.github.io/kit */
 /* SolidKit v1.0 — safety layer only. No palette, no typography, no layout:
@@ -65,399 +65,457 @@
   </style>
   <style>
     :root {
-      --bg: #fafbfc;
-      --card: #ffffff;
-      --primary: #4a7c59;
-      --primary-light: #e8f0eb;
-      --accent: #7eb77f;
-      --text: #2d3748;
-      --text-muted: #718096;
-      --border: #e2e8f0;
-      --danger: #e57373;
-      --danger-light: #ffebee;
-      --shadow: 0 2px 8px rgba(0,0,0,0.08);
-      --radius: 12px;
+      --bg: #f2f4f8;
+      --bg-soft: #f5f7fa;
+      --card: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(17, 24, 39, 0.07);
+      --text: #141a26;
+      --text-dim: #6a7688;
+      --accent: #0d9e6e;
+      --accent-bright: #34d399;
+      --accent-soft: rgba(13, 158, 110, 0.10);
+      --accent-2: #6366f1;
+      --danger: #e11d48;
+      --radius: 20px;
+      --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 10px 30px rgba(16, 24, 40, 0.07);
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { color-scheme: light; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
+      font-family: var(--font);
+      background: linear-gradient(180deg, #f7f8fb 0%, var(--bg) 60%, #eceff4 100%);
+      background-attachment: fixed;
       color: var(--text);
       min-height: 100vh;
-      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
-    .container {
-      max-width: 480px;
+    /* Ambient glows */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 480px; height: 480px;
+      top: -160px; right: -120px;
+      background: rgba(99, 102, 241, 0.10);
+    }
+    body::after {
+      width: 420px; height: 420px;
+      bottom: -180px; left: -140px;
+      background: rgba(52, 211, 153, 0.12);
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 440px;
       margin: 0 auto;
+      padding: 32px 20px 96px;
     }
 
-    header {
-      text-align: center;
-      padding: 24px 0 32px;
-    }
-
-    header h1 {
-      font-size: 1.75rem;
-      font-weight: 600;
-      color: var(--primary);
-    }
-
-    header p {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      margin-top: 4px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 1rem;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-light);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 12px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-      width: 100%;
-    }
-
-    .btn-primary:hover {
-      background: #3d6a4a;
-    }
-
-    .btn-icon {
-      background: transparent;
-      padding: 8px;
-      color: var(--text-muted);
-    }
-
-    .btn-icon:hover {
-      background: var(--danger-light);
-      color: var(--danger);
-    }
-
-    .alarm-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .alarm-item {
+    /* ---------- Header ---------- */
+    .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 650;
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
+    }
+    .brand-dot {
+      width: 30px; height: 30px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-bright), var(--accent-2));
+      display: grid;
+      place-items: center;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .brand-dot svg { width: 17px; height: 17px; }
+    .topbar-date {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- Hero clock ---------- */
+    .hero {
+      text-align: center;
+      padding: 8px 0 28px;
+    }
+    .clock {
+      font-size: 4.4rem;
+      font-weight: 250;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, #1b2434, #55637a);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .clock .sec {
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: var(--text-dim);
+      -webkit-text-fill-color: var(--text-dim);
+      letter-spacing: 0;
+    }
+    .next-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 14px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(13, 158, 110, 0.28);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 550;
+    }
+    .next-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .next-chip.none {
       background: var(--card);
+      border-color: var(--card-border);
+      color: var(--text-dim);
+    }
+
+    /* ---------- Sections ---------- */
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 650;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin: 26px 4px 12px;
+    }
+
+    /* ---------- Notification prompt ---------- */
+    .notification-prompt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
       border-radius: var(--radius);
+      border: 1px solid var(--card-border);
+      background: var(--card);
       box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
     }
-
-    .alarm-item.ringing {
-      animation: ring 0.5s ease-in-out infinite alternate;
-      border: 2px solid var(--primary);
-    }
-
-    @keyframes ring {
-      from { transform: scale(1); }
-      to { transform: scale(1.02); }
-    }
-
-    .alarm-info {
+    .notification-prompt p {
       flex: 1;
       min-width: 0;
-      padding-right: 12px;
-    }
-
-    .alarm-info h3 {
-      font-size: 1.5rem;
-      font-weight: 600;
-    }
-
-    .alarm-info p {
       font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 2px;
+      color: var(--text-dim);
+    }
+    .btn-enable {
+      flex-shrink: 0;
+      padding: 9px 14px;
+      border: 1px solid rgba(13, 158, 110, 0.28);
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      font-weight: 650;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-enable:hover { background: var(--accent); color: #fff; }
+
+    /* ---------- Quick add ---------- */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .preset {
+      padding: 12px 4px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .preset:hover {
+      border-color: rgba(13, 158, 110, 0.45);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .preset:active { transform: scale(0.94); }
+
+    /* ---------- New alarm panel ---------- */
+    .composer {
+      margin-top: 12px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .time-input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-soft);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 1.6rem;
+      font-weight: 500;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .time-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .time-colon { font-size: 1.6rem; color: var(--text-dim); font-weight: 300; }
+
+    .ampm {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .ampm button {
+      padding: 10px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      font-weight: 650;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .ampm button.active { background: var(--accent); color: #fff; }
+
+    .label-input {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-soft);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.92rem;
+    }
+    .label-input::placeholder { color: var(--text-dim); }
+    .label-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .btn-set {
+      padding: 14px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent-bright), #10b981);
+      color: #052e1c;
+      font-family: var(--font);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .btn-set:hover { filter: brightness(1.08); }
+    .btn-set:active { transform: scale(0.98); }
+
+    /* ---------- Alarm list ---------- */
+    .alarm-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .alarm {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s, opacity 0.2s;
+    }
+    .alarm.off { opacity: 0.45; }
+
+    .alarm-body { flex: 1; min-width: 0; }
+    .alarm-time {
+      font-size: 1.9rem;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .alarm-time .ap {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      margin-left: 4px;
+    }
+    .alarm-meta {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-top: 3px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
+    .alarm.ringing {
+      border-color: rgba(13, 158, 110, 0.55);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: var(--shadow), 0 0 0 0 rgba(13, 158, 110, 0.3); }
+      50% { box-shadow: var(--shadow), 0 0 0 8px rgba(13, 158, 110, 0); }
+    }
+
     .alarm-actions {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 8px;
       flex-shrink: 0;
     }
 
-    .toggle {
+    .btn-dismiss {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ---------- Toggle ---------- */
+    .switch {
       position: relative;
-      width: 48px;
-      height: 28px;
+      width: 46px;
+      height: 27px;
+      flex-shrink: 0;
+      cursor: pointer;
     }
-
-    .toggle input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .toggle-slider {
+    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .track {
       position: absolute;
       inset: 0;
-      background: var(--border);
-      border-radius: 28px;
-      cursor: pointer;
-      transition: 0.3s;
+      border-radius: 999px;
+      background: rgba(17, 24, 39, 0.14);
+      transition: background 0.2s;
     }
-
-    .toggle-slider:before {
+    .track::after {
       content: '';
       position: absolute;
-      height: 22px;
-      width: 22px;
-      left: 3px;
-      bottom: 3px;
-      background: white;
+      top: 3px; left: 3px;
+      width: 21px; height: 21px;
       border-radius: 50%;
-      transition: 0.3s;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.3);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+    .switch input:checked + .track { background: var(--accent); }
+    .switch input:checked + .track::after { transform: translateX(19px); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-    .toggle input:checked + .toggle-slider {
-      background: var(--primary);
-    }
-
-    .toggle input:checked + .toggle-slider:before {
-      transform: translateX(20px);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 20px;
-      color: var(--text-muted);
-    }
-
-    .empty-state svg {
-      width: 64px;
-      height: 64px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-    }
-
-    .notification-prompt {
-      background: var(--primary-light);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-
-    .notification-prompt p {
-      font-size: 0.9rem;
-      margin-bottom: 12px;
-    }
-
-    .notification-prompt .btn {
-      background: var(--primary);
-      color: white;
-    }
-
-    .current-time {
-      font-size: 3rem;
-      font-weight: 300;
-      text-align: center;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-
-    .preset-buttons {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .btn-preset {
-      flex: 1;
-      min-width: 60px;
-      padding: 12px 8px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-preset:hover {
-      border-color: var(--primary);
-      background: var(--primary-light);
-      color: var(--primary);
-    }
-
-    .btn-preset:active {
-      transform: scale(0.97);
-    }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      margin: 20px 0;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-    }
-
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    .divider span {
-      padding: 0 12px;
-    }
-
-    .time-picker {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .time-select {
-      flex: 1;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 1.25rem;
-      font-weight: 500;
-      text-align: center;
-      background: var(--bg);
-      color: var(--text);
-      cursor: pointer;
-      appearance: none;
-      -webkit-appearance: none;
-    }
-
-    .time-select:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-light);
-    }
-
-    .time-colon {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .period-toggle {
-      display: flex;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .period-btn {
-      padding: 12px 14px;
+    .btn-del {
       border: none;
-      background: var(--bg);
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      font-weight: 600;
+      background: transparent;
+      color: var(--text-dim);
+      padding: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: all 0.2s;
+      display: grid;
+      place-items: center;
+      transition: color 0.15s, background 0.15s;
+    }
+    .btn-del:hover { color: var(--danger); background: rgba(225, 29, 72, 0.08); }
+    .btn-del svg { width: 17px; height: 17px; }
+
+    /* ---------- Empty state ---------- */
+    .empty {
+      text-align: center;
+      padding: 44px 20px;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+    .empty svg {
+      width: 44px; height: 44px;
+      margin-bottom: 12px;
+      opacity: 0.4;
+    }
+    .empty p + p { margin-top: 4px; opacity: 0.7; }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%) translateY(80px);
+      max-width: min(420px, calc(100vw - 32px));
+      padding: 11px 20px;
+      border-radius: 999px;
+      background: #1c2230;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f2f4f8;
+      font-size: 0.85rem;
+      text-align: center;
+      overflow-wrap: anywhere;
+      opacity: 0;
+      transition: transform 0.25s, opacity 0.25s;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
     }
 
-    .period-btn:first-child {
-      border-right: 1px solid var(--border);
-    }
-
-    .period-btn.active {
-      background: var(--primary);
-      color: white;
-    }
-
-    .period-btn:not(.active):hover {
-      background: var(--primary-light);
-      color: var(--primary);
-    }
-
-    .btn-dismiss {
-      background: var(--primary);
-      color: white;
-      padding: 10px 16px;
-    }
-
-    .btn-dismiss:hover {
-      background: #3d6a4a;
-    }
-
-    .btn-delete {
-      background: var(--danger-light);
-      color: var(--danger);
-      padding: 10px 16px;
-    }
-
-    .btn-delete:hover {
-      background: var(--danger);
-      color: white;
-    }
-
+    /* Focus rings: the kit's currentColor default is invisible on the
+     * gradient Set-alarm button, so pin these to the accent. */
     button:focus-visible,
-    .time-select:focus-visible {
-      outline: 2px solid var(--primary);
+    .time-input:focus-visible,
+    .label-input:focus-visible {
+      outline: 2px solid var(--accent);
       outline-offset: 2px;
-    }
-
-    .toggle input:focus-visible + .toggle-slider {
-      box-shadow: 0 0 0 3px var(--primary-light), 0 0 0 4px var(--primary);
     }
 
     /* reduced-motion handling provided by vendored kit.css above */
@@ -466,6 +524,7 @@
 </head>
 <body>
   <div id="app"></div>
+  <div class="toast" id="toast"></div>
 
   <script>
 /* SolidKit v1.0 vendored — do not edit; canonical: solid-apps.github.io/kit */
@@ -1307,29 +1366,77 @@
     // UI COMPONENTS
     // ============================================
 
-    const ClockIcon = () => html`
+    const BellIcon = () => html`
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>
+        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5S10.5 3.17 10.5 4v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
       </svg>
     `;
 
     const DeleteIcon = () => html`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
       </svg>
     `;
 
-    const CurrentTime = () => {
-      const [time, setTime] = useState(new Date());
+    // Bound to the app's own toast element so SolidKit's timer/ARIA handling
+    // drives the mockup's visuals rather than its inline fallback styling.
+    const toast = window.SolidKit
+      ? SolidKit.toaster(document.getElementById('toast'), 'show')
+      : () => {};
+
+    const TopBar = ({ now }) => html`
+      <div class="topbar">
+        <div class="brand">
+          <span class="brand-dot"><${BellIcon} /></span>
+          Alarm
+        </div>
+        <div class="topbar-date">
+          ${now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+        </div>
+      </div>
+    `;
+
+    // Minutes from `now` until the next firing of an enabled alarm, or null.
+    const nextAlarmIn = (alarms, now) => {
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      let best = null;
+      alarms.forEach(a => {
+        if (!a.enabled || a.ringing) return;
+        const [h, m] = a.time.split(':').map(Number);
+        let diff = h * 60 + m - nowMin;
+        if (diff <= 0) diff += 1440; // already passed today → tomorrow
+        if (!best || diff < best.diff) best = { diff, alarm: a };
+      });
+      return best;
+    };
+
+    const HeroClock = ({ alarms }) => {
+      const [now, setNow] = useState(new Date());
 
       useEffect(() => {
-        const interval = setInterval(() => setTime(new Date()), 1000);
+        const interval = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(interval);
       }, []);
 
-      const formatted = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const pad = (n) => String(n).padStart(2, '0');
+      const h12 = now.getHours() % 12 || 12;
+      const next = nextAlarmIn(alarms, now);
+      const chip = next && (() => {
+        const h = Math.floor(next.diff / 60), m = next.diff % 60;
+        return `Next: ${TimeParser.toDisplay(next.alarm.time)} · in ${h ? `${h}h ${m}m` : `${m} min`}`;
+      })();
 
-      return html`<div class="current-time">${formatted}</div>`;
+      return html`
+        <${TopBar} now=${now} />
+        <div class="hero">
+          <div class="clock">
+            ${pad(h12)}:${pad(now.getMinutes())}<span class="sec">:${pad(now.getSeconds())}</span>
+          </div>
+          ${chip
+            ? html`<span class="next-chip"><${BellIcon} />${chip}</span>`
+            : html`<span class="next-chip none">No alarms set</span>`}
+        </div>
+      `;
     };
 
     const NotificationPrompt = ({ onDone }) => {
@@ -1343,7 +1450,7 @@
       return html`
         <div class="notification-prompt">
           <p>Enable notifications to receive alarm alerts</p>
-          <button type="button" class="btn" onClick=${handleClick}>Enable Notifications</button>
+          <button type="button" class="btn-enable" onClick=${handleClick}>Enable</button>
         </div>
       `;
     };
@@ -1480,108 +1587,110 @@
       const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
       return html`
-        <div class="card">
-          <div class="form-group">
-            <label>Quick alarm</label>
-            <div class="preset-buttons">
-              ${presets.map(p => html`
-                <button
-                  type="button"
-                  class="btn-preset"
-                  onClick=${() => addInMinutes(p.minutes)}
-                >
-                  ${p.label}
-                </button>
-              `)}
+        <div class="section-label">Quick alarm</div>
+        <div class="presets">
+          ${presets.map(p => html`
+            <button
+              type="button"
+              class="preset"
+              onClick=${() => addInMinutes(p.minutes)}
+            >
+              ${p.label}
+            </button>
+          `)}
+        </div>
+
+        <div class="section-label">New alarm</div>
+        <div class="composer">
+          <div class="time-row">
+            <select
+              class="time-input"
+              aria-label="Hour"
+              value=${hour}
+              onChange=${(e) => setHour(parseInt(e.target.value))}
+            >
+              ${hours.map(h => html`<option value=${h}>${h}</option>`)}
+            </select>
+            <span class="time-colon">:</span>
+            <select
+              class="time-input"
+              aria-label="Minute"
+              value=${minute}
+              onChange=${(e) => setMinute(parseInt(e.target.value))}
+            >
+              ${minutes.map(m => html`<option value=${m}>${String(m).padStart(2, '0')}</option>`)}
+            </select>
+            <div class="ampm">
+              <button
+                type="button"
+                class=${period === 'AM' ? 'active' : ''}
+                aria-pressed=${period === 'AM'}
+                onClick=${() => setPeriod('AM')}
+              >AM</button>
+              <button
+                type="button"
+                class=${period === 'PM' ? 'active' : ''}
+                aria-pressed=${period === 'PM'}
+                onClick=${() => setPeriod('PM')}
+              >PM</button>
             </div>
           </div>
 
-          <div class="divider">
-            <span>or set specific time</span>
-          </div>
+          <input
+            class="label-input"
+            type="text"
+            maxlength="40"
+            aria-label="Alarm label"
+            value=${label}
+            onInput=${(e) => setLabel(e.target.value)}
+            onKeyDown=${(e) => { if (e.key === 'Enter') addAtTime(); }}
+            placeholder="Label — Wake up, Meeting…"
+          />
 
-          <div class="form-group">
-            <label>Time</label>
-            <div class="time-picker">
-              <select
-                class="time-select"
-                aria-label="Hour"
-                value=${hour}
-                onChange=${(e) => setHour(parseInt(e.target.value))}
-              >
-                ${hours.map(h => html`<option value=${h}>${h}</option>`)}
-              </select>
-              <span class="time-colon">:</span>
-              <select
-                class="time-select"
-                aria-label="Minute"
-                value=${minute}
-                onChange=${(e) => setMinute(parseInt(e.target.value))}
-              >
-                ${minutes.map(m => html`<option value=${m}>${String(m).padStart(2, '0')}</option>`)}
-              </select>
-              <div class="period-toggle">
-                <button
-                  type="button"
-                  class=${`period-btn ${period === 'AM' ? 'active' : ''}`}
-                  onClick=${() => setPeriod('AM')}
-                >AM</button>
-                <button
-                  type="button"
-                  class=${`period-btn ${period === 'PM' ? 'active' : ''}`}
-                  onClick=${() => setPeriod('PM')}
-                >PM</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Label (optional)</label>
-            <input
-              type="text"
-              value=${label}
-              onInput=${(e) => setLabel(e.target.value)}
-              onKeyDown=${(e) => { if (e.key === 'Enter') addAtTime(); }}
-              placeholder="Wake up, Meeting, etc."
-            />
-          </div>
-
-          <button type="button" class="btn btn-primary" onClick=${addAtTime}>
-            Set Alarm
+          <button type="button" class="btn-set" onClick=${addAtTime}>
+            Set alarm
           </button>
         </div>
       `;
     };
 
     const AlarmItem = ({ alarm, onToggle, onDelete, onDismiss }) => {
+      const display = TimeParser.toDisplay(alarm.time);
+      const [main, ap] = display.split(' ');
+
       return html`
-        <div class="alarm-item ${alarm.ringing ? 'ringing' : ''}">
-          <div class="alarm-info">
-            <h3>${TimeParser.toDisplay(alarm.time)}</h3>
-            <p>${alarm.label || 'Alarm'}</p>
+        <div class=${`alarm ${alarm.ringing ? 'ringing' : alarm.enabled ? '' : 'off'}`}>
+          <div class="alarm-body">
+            <div class="alarm-time">${main}<span class="ap">${ap}</span></div>
+            <div class="alarm-meta" title=${alarm.label || 'Alarm'}>${alarm.label || 'Alarm'}</div>
           </div>
           <div class="alarm-actions">
             ${alarm.ringing ? html`
-              <button class="btn btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
+              <button type="button" class="btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
                 Dismiss
               </button>
-              <button class="btn btn-delete" onClick=${() => onDelete(alarm.id)}>
-                Delete
+              <button
+                type="button"
+                class="btn-del"
+                aria-label="Delete alarm ${display}"
+                onClick=${() => onDelete(alarm.id)}
+              >
+                <${DeleteIcon} />
               </button>
             ` : html`
-              <label class="toggle">
+              <label class="switch">
                 <input
                   type="checkbox"
                   checked=${alarm.enabled}
                   onChange=${() => onToggle(alarm.id)}
-                  aria-label="Enable alarm ${TimeParser.toDisplay(alarm.time)}"
+                  aria-label="Enable alarm ${display}"
                 />
-                <span class="toggle-slider"></span>
+                <span class="track"></span>
               </label>
               <button
                 type="button"
-                class="btn btn-icon"
-                aria-label="Delete alarm ${TimeParser.toDisplay(alarm.time)}"
+                class="btn-del"
+                aria-label="Delete alarm ${display}"
                 onClick=${() => onDelete(alarm.id)}
               >
                 <${DeleteIcon} />
@@ -1593,10 +1702,10 @@
     };
 
     const EmptyState = () => html`
-      <div class="empty-state">
-        <${ClockIcon} />
+      <div class="empty">
+        <${BellIcon} />
         <p>No alarms yet</p>
-        <p>Add your first alarm above</p>
+        <p>Add your first one above</p>
       </div>
     `;
 
@@ -1620,6 +1729,7 @@
 
       const handleAddAlarm = useCallback((time, label) => {
         alarmService.addAlarm(time, label);
+        toast(`Alarm set for ${TimeParser.toDisplay(time)}`);
       }, []);
 
       const handleToggle = useCallback((id) => {
@@ -1637,13 +1747,8 @@
       const sortedAlarms = [...alarms].sort((a, b) => a.time.localeCompare(b.time));
 
       return html`
-        <div class="container">
-          <header>
-            <h1>Alarm</h1>
-            <p>Simple & Beautiful</p>
-          </header>
-
-          <${CurrentTime} />
+        <div class="wrap">
+          <${HeroClock} alarms=${alarms} />
 
           ${showNotificationPrompt && html`
             <${NotificationPrompt} onDone=${() => setShowNotificationPrompt(false)} />
@@ -1651,6 +1756,7 @@
 
           <${AlarmForm} onAdd=${handleAddAlarm} />
 
+          <div class="section-label">Your alarms</div>
           <div class="alarm-list">
             ${sortedAlarms.length === 0
               ? html`<${EmptyState} />`
