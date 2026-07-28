@@ -116,24 +116,24 @@
       overflow-x: hidden;
     }
 
-    /* Ambient glows */
+    /* Ambient glows — committed, symmetric; faint blobs read as smudge */
     body::before, body::after {
       content: '';
       position: fixed;
       border-radius: 50%;
-      filter: blur(120px);
+      filter: blur(110px);
       pointer-events: none;
       z-index: 0;
     }
     body::before {
-      width: 480px; height: 480px;
-      top: -160px; right: -120px;
-      background: rgba(99, 102, 241, 0.10);
+      width: 700px; height: 500px;
+      top: -140px; left: 6%;
+      background: rgba(52, 211, 153, 0.22);
     }
     body::after {
-      width: 420px; height: 420px;
-      bottom: -180px; left: -140px;
-      background: rgba(52, 211, 153, 0.12);
+      width: 660px; height: 480px;
+      top: 12%; right: 2%;
+      background: rgba(16, 185, 129, 0.14);
     }
 
     .wrap {
@@ -143,6 +143,80 @@
       margin: 0 auto;
       padding: 32px 20px 96px;
     }
+
+    /* Desktop: two-pane grid — creation left, alarm list right, so the
+     * list sits above the fold instead of a phone column in a sea of white. */
+    @media (min-width: 1080px) {
+      .wrap {
+        max-width: 1040px;
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 440px minmax(0, 1fr);
+        column-gap: 64px;
+        align-items: start;
+        /* Center the composition vertically so whitespace is symmetric
+         * instead of pooling below the content. */
+        align-content: center;
+        padding-top: 28px;
+        padding-bottom: 48px;
+      }
+      .topbar { grid-column: 1 / -1; margin-bottom: 40px; }
+      /* One shared datum: the list eyebrow aligns with the hero date line */
+      .col-list .section-label:first-child { margin-top: 14px; }
+      .col-list { align-self: center; }
+    }
+
+    /* Page-level urgency while any alarm rings: quiet everything that
+     * isn't the alarm. The banner disappears entirely — no nagging
+     * mid-ring. */
+    body.is-ringing .col-main { opacity: 0.72; transition: opacity 0.3s; }
+    /* visibility, not display: the page is vertically centered, so
+     * collapsing the banner would shift every element mid-ring. */
+    body.is-ringing .notification-prompt { visibility: hidden; }
+
+    .btn-close {
+      flex-shrink: 0;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-close:hover { color: #475569; background: rgba(15, 23, 42, 0.05); }
+
+    /* Direction-aware empty-state hint: the composer is above on mobile,
+     * to the left on the desktop grid. */
+    .when-desktop { display: none; }
+    @media (min-width: 1080px) {
+      .when-desktop { display: inline; }
+      .when-mobile { display: none; }
+    }
+
+    /* xlogin's floating pill renders in a closed shadow root (unstyleable,
+     * off-palette, off-grid). Hide it; the topbar renders its own auth
+     * button wired to window.xlogin.login()/logout(). */
+    #xlogin-widget { display: none !important; }
+
+    .btn-auth {
+      background: transparent;
+      color: #0f766e;
+      border: 1px solid rgba(15, 118, 110, 0.35);
+      border-radius: 9999px;
+      padding: 7px 16px;
+      font-family: var(--font);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-auth:hover { background: rgba(15, 118, 110, 0.08); }
 
     /* ---------- Header ---------- */
     .topbar {
@@ -163,41 +237,69 @@
     .brand-dot {
       width: 30px; height: 30px;
       border-radius: 10px;
-      background: linear-gradient(135deg, var(--accent-bright), var(--accent-2));
+      background: linear-gradient(135deg, var(--accent-bright), #059669);
       display: grid;
       place-items: center;
       color: #fff;
       flex-shrink: 0;
     }
     .brand-dot svg { width: 17px; height: 17px; }
-    .topbar-date {
-      font-size: 0.82rem;
-      color: var(--text-dim);
-      font-variant-numeric: tabular-nums;
-    }
 
     /* ---------- Hero clock ---------- */
     .hero {
       text-align: center;
       padding: 8px 0 28px;
     }
+    .hero-date {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #64748b;
+      margin-bottom: 10px;
+      font-variant-numeric: tabular-nums;
+    }
     .clock {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
       font-size: 4.4rem;
       font-weight: 250;
       letter-spacing: -0.04em;
       line-height: 1;
       font-variant-numeric: tabular-nums;
-      background: linear-gradient(180deg, #1b2434, #55637a);
+      background: linear-gradient(180deg, #1b2434, #3a4658);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
     }
+    /* No transform here: a transformed child breaks background-clip:text */
+    .clock .colon { margin: 0 0.02em; }
+    /* Meridiem + live seconds stacked beside the time, flip-clock style —
+     * inline seconds read as extra digits ("9:50 14"). */
+    .clock .clock-side {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      margin-left: 12px;
+      align-self: flex-end;
+      padding-bottom: 4px;
+    }
+    .clock .mer {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #64748b;
+      -webkit-text-fill-color: #64748b;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
     .clock .sec {
-      font-size: 1.6rem;
-      font-weight: 400;
-      color: var(--text-dim);
-      -webkit-text-fill-color: var(--text-dim);
+      font-size: 1rem;
+      font-weight: 500;
+      color: #64748b;
+      -webkit-text-fill-color: #64748b;
       letter-spacing: 0;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
     }
     .next-chip {
       display: inline-flex;
@@ -208,9 +310,10 @@
       border-radius: 999px;
       background: var(--accent-soft);
       border: 1px solid rgba(13, 158, 110, 0.28);
-      color: var(--accent);
-      font-size: 0.82rem;
-      font-weight: 550;
+      color: #047857;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
     .next-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
     .next-chip.none {
@@ -218,49 +321,54 @@
       border-color: var(--card-border);
       color: var(--text-dim);
     }
+    .next-chip.alarm-live {
+      background: #059669;
+      border-color: #047857;
+      color: #fff;
+      animation: ring-pulse 1.2s ease-in-out infinite;
+    }
 
     /* ---------- Sections ---------- */
     .section-label {
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 650;
       letter-spacing: 0.09em;
       text-transform: uppercase;
-      color: var(--text-dim);
+      color: #64748b;
       margin: 26px 4px 12px;
     }
 
-    /* ---------- Notification prompt ---------- */
+    /* ---------- Notification prompt (tinted info surface) ---------- */
     .notification-prompt {
       display: flex;
       align-items: center;
       gap: 12px;
       padding: 14px 16px;
       border-radius: var(--radius);
-      border: 1px solid var(--card-border);
-      background: var(--card);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
+      border: 1px solid #d1fae5;
+      background: rgba(255, 255, 255, 0.5);
     }
     .notification-prompt p {
       flex: 1;
       min-width: 0;
-      font-size: 0.85rem;
-      color: var(--text-dim);
+      font-size: 0.875rem;
+      color: #065f46;
     }
     .btn-enable {
       flex-shrink: 0;
-      padding: 9px 14px;
-      border: 1px solid rgba(13, 158, 110, 0.28);
-      border-radius: 12px;
-      background: var(--accent-soft);
-      color: var(--accent);
+      padding: 9px 18px;
+      border: none;
+      border-radius: 9999px;
+      background: #059669;
+      color: #fff;
       font-family: var(--font);
-      font-size: 0.8rem;
+      font-size: 0.8125rem;
       font-weight: 650;
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.15s, transform 0.1s;
     }
-    .btn-enable:hover { background: var(--accent); color: #fff; }
+    .btn-enable:hover { background: #047857; }
+    .btn-enable:active { transform: scale(0.97); }
 
     /* ---------- Quick add ---------- */
     .presets {
@@ -271,11 +379,12 @@
     .preset {
       padding: 12px 4px;
       border-radius: 14px;
-      border: 1px solid var(--card-border);
-      background: var(--card);
+      border: 1px solid rgba(15, 23, 42, 0.07);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+      background: #fff;
       color: var(--text);
       font-family: var(--font);
-      font-size: 0.78rem;
+      font-size: 0.8125rem;
       font-weight: 600;
       cursor: pointer;
       transition: transform 0.15s, border-color 0.15s, background 0.15s;
@@ -294,7 +403,7 @@
       border-radius: var(--radius);
       border: 1px solid var(--card-border);
       background: var(--card);
-      box-shadow: var(--shadow);
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
       backdrop-filter: blur(12px);
       display: flex;
       flex-direction: column;
@@ -308,45 +417,58 @@
     .time-input {
       flex: 1;
       min-width: 0;
-      padding: 12px;
+      height: 52px;
+      padding: 0 32px 0 14px;
+      appearance: none;
+      -webkit-appearance: none;
       border-radius: 14px;
-      border: 1px solid var(--card-border);
-      background: var(--bg-soft);
+      border: 1px solid #e2e8f0;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2394a3b8' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center;
       color: var(--text);
       font-family: var(--font);
-      font-size: 1.6rem;
+      font-size: 1.35rem;
       font-weight: 500;
       text-align: center;
       font-variant-numeric: tabular-nums;
       transition: border-color 0.15s, box-shadow 0.15s;
+      cursor: pointer;
     }
     .time-input:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-soft);
     }
-    .time-colon { font-size: 1.6rem; color: var(--text-dim); font-weight: 300; }
+    .time-colon {
+      font-size: 1.35rem;
+      color: var(--text-dim);
+      font-weight: 400;
+      align-self: center;
+      line-height: 1;
+      transform: translateY(-1px);
+    }
 
     .ampm {
       display: flex;
-      flex-direction: column;
-      border: 1px solid var(--card-border);
+      height: 52px;
+      border: 1px solid #e2e8f0;
       border-radius: 14px;
       overflow: hidden;
       flex-shrink: 0;
+      background: #fff;
     }
     .ampm button {
-      padding: 10px 14px;
+      width: 52px;
       border: none;
       background: transparent;
-      color: var(--text-dim);
+      color: #64748b;
       font-family: var(--font);
-      font-size: 0.8rem;
+      font-size: 0.8125rem;
       font-weight: 650;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .ampm button.active { background: var(--accent); color: #fff; }
+    .ampm button + button { border-left: 1px solid #e2e8f0; }
+    .ampm button.active { background: #059669; color: #fff; }
 
     .label-input {
       padding: 12px 14px;
@@ -355,7 +477,7 @@
       background: var(--bg-soft);
       color: var(--text);
       font-family: var(--font);
-      font-size: 0.92rem;
+      font-size: 0.9375rem;
     }
     .label-input::placeholder { color: var(--text-dim); }
     .label-input:focus {
@@ -368,15 +490,15 @@
       padding: 14px;
       border: none;
       border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent-bright), #10b981);
-      color: #052e1c;
+      background: #047857;
+      color: #fff;
       font-family: var(--font);
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 0.9375rem;
+      font-weight: 650;
       cursor: pointer;
-      transition: transform 0.15s, filter 0.15s;
+      transition: transform 0.15s, background 0.15s;
     }
-    .btn-set:hover { filter: brightness(1.08); }
+    .btn-set:hover { background: #065f46; }
     .btn-set:active { transform: scale(0.98); }
 
     /* ---------- Alarm list ---------- */
@@ -389,12 +511,18 @@
       padding: 18px;
       border-radius: var(--radius);
       border: 1px solid var(--card-border);
-      background: var(--card);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-      transition: border-color 0.2s, opacity 0.2s;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
     }
-    .alarm.off { opacity: 0.45; }
+    .alarm:hover { box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08); }
+
+    /* Disabled: quiet the text, NOT the toggle — the toggle is exactly the
+     * control needed to re-enable, and fading it reads as broken. */
+    .alarm.off { background: #f8fafc; }
+    .alarm.off .alarm-time,
+    .alarm.off .alarm-time .ap,
+    .alarm.off .alarm-meta { color: #64748b; }
 
     .alarm-body { flex: 1; min-width: 0; }
     .alarm-time {
@@ -405,27 +533,33 @@
       line-height: 1.1;
     }
     .alarm-time .ap {
-      font-size: 0.85rem;
+      font-size: 0.875rem;
       font-weight: 600;
       color: var(--text-dim);
       margin-left: 4px;
     }
     .alarm-meta {
-      font-size: 0.8rem;
-      color: var(--text-dim);
+      font-size: 0.8125rem;
+      color: #64748b;
       margin-top: 3px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
+    /* Ringing: the loudest thing on the page, as an alarm should be. */
     .alarm.ringing {
-      border-color: rgba(13, 158, 110, 0.55);
-      animation: pulse 1.4s ease-in-out infinite;
+      background: linear-gradient(160deg, #059669, #047857);
+      border-color: transparent;
+      box-shadow: 0 8px 28px rgba(5, 150, 105, 0.45);
+      animation: ring-pulse 1.2s ease-in-out infinite;
     }
-    @keyframes pulse {
-      0%, 100% { box-shadow: var(--shadow), 0 0 0 0 rgba(13, 158, 110, 0.3); }
-      50% { box-shadow: var(--shadow), 0 0 0 8px rgba(13, 158, 110, 0); }
+    .alarm.ringing .alarm-time { color: #fff; }
+    .alarm.ringing .alarm-time .ap { color: rgba(255, 255, 255, 0.92); }
+    .alarm.ringing .alarm-meta { color: rgba(255, 255, 255, 0.95); }
+    @keyframes ring-pulse {
+      0%, 100% { box-shadow: 0 8px 28px rgba(5, 150, 105, 0.45); }
+      50% { box-shadow: 0 8px 38px rgba(5, 150, 105, 0.7); }
     }
 
     .alarm-actions {
@@ -435,17 +569,36 @@
       flex-shrink: 0;
     }
 
-    .btn-dismiss {
-      padding: 10px 16px;
-      border: none;
+    .btn-snooze {
+      min-height: 44px;
+      padding: 12px 20px;
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
       border-radius: 12px;
-      background: var(--accent);
+      background: transparent;
       color: #fff;
       font-family: var(--font);
-      font-size: 0.85rem;
+      font-size: 0.9375rem;
+      font-weight: 650;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-snooze:hover { background: rgba(255, 255, 255, 0.26); }
+    .btn-snooze:active { transform: scale(0.96); }
+    .btn-dismiss {
+      min-height: 44px;
+      padding: 12px 26px;
+      border: none;
+      border-radius: 12px;
+      background: #fff;
+      color: #065f46;
+      font-family: var(--font);
+      font-size: 0.9375rem;
       font-weight: 700;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(4, 47, 34, 0.25);
+      transition: transform 0.1s;
     }
+    .btn-dismiss:active { transform: scale(0.96); }
 
     /* ---------- Toggle ---------- */
     .switch {
@@ -460,7 +613,8 @@
       position: absolute;
       inset: 0;
       border-radius: 999px;
-      background: rgba(17, 24, 39, 0.14);
+      background: #cbd5e1;
+      border: 1px solid rgba(15, 23, 42, 0.08);
       transition: background 0.2s;
     }
     .track::after {
@@ -481,29 +635,37 @@
       border: none;
       background: transparent;
       color: var(--text-dim);
-      padding: 8px;
+      padding: 11px;
       border-radius: 10px;
       cursor: pointer;
       display: grid;
       place-items: center;
-      transition: color 0.15s, background 0.15s;
+      transition: color 0.15s, background 0.15s, transform 0.1s;
     }
     .btn-del:hover { color: var(--danger); background: rgba(225, 29, 72, 0.08); }
-    .btn-del svg { width: 17px; height: 17px; }
+    .btn-del:active { transform: scale(0.94); }
+    .btn-del svg { width: 18px; height: 18px; }
 
-    /* ---------- Empty state ---------- */
+    /* ---------- Empty state (anchored placeholder card) ---------- */
     .empty {
       text-align: center;
-      padding: 44px 20px;
+      padding: 40px 24px;
       color: var(--text-dim);
-      font-size: 0.9rem;
+      border: 1px solid #e2e8f0;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: var(--radius);
     }
     .empty svg {
-      width: 44px; height: 44px;
+      width: 36px; height: 36px;
       margin-bottom: 12px;
-      opacity: 0.4;
+      color: #6ee7b7;
     }
-    .empty p + p { margin-top: 4px; opacity: 0.7; }
+    .empty p:first-of-type {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #475569;
+    }
+    .empty p + p { margin-top: 4px; font-size: 0.8125rem; }
 
     /* ---------- Toast ---------- */
     .toast {
@@ -517,7 +679,7 @@
       background: #1c2230;
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: #f2f4f8;
-      font-size: 0.85rem;
+      font-size: 0.875rem;
       text-align: center;
       overflow-wrap: anywhere;
       opacity: 0;
@@ -1336,7 +1498,16 @@
           const minuteKey = Math.floor(now.getTime() / 60000);
 
           alarms.forEach(alarm => {
+            // A snoozed alarm re-fires at its snooze deadline, independent
+            // of its base time.
+            if (alarm.enabled && !alarm.ringing && alarm.snoozeUntil &&
+                now.getTime() >= alarm.snoozeUntil) {
+              delete alarm.snoozeUntil;
+              this.triggerAlarm(alarm.id);
+              return;
+            }
             if (alarm.enabled && alarm.time === currentTime && !alarm.ringing &&
+                !alarm.snoozeUntil &&
                 lastFiredMinute.get(alarm.id) !== minuteKey) {
               lastFiredMinute.set(alarm.id, minuteKey);
               this.triggerAlarm(alarm.id);
@@ -1363,8 +1534,21 @@
           if (!alarm) return;
 
           alarm.ringing = false;
+          delete alarm.snoozeUntil;
           // Keep enabled so it rings again tomorrow.
           // Only silence the beep if no other alarm is still ringing.
+          if (!alarms.some(a => a.ringing)) AudioService.stop();
+
+          await storageService.saveAlarms(alarms);
+          notify();
+        },
+
+        async snoozeAlarm(id, minutes = 9) {
+          const alarm = alarms.find(a => a.id === id);
+          if (!alarm || !alarm.ringing) return;
+
+          alarm.ringing = false;
+          alarm.snoozeUntil = Date.now() + minutes * 60000;
           if (!alarms.some(a => a.ringing)) AudioService.stop();
 
           await storageService.saveAlarms(alarms);
@@ -1542,17 +1726,42 @@
       ? SolidKit.toaster(document.getElementById('toast'), 'show')
       : () => {};
 
-    const TopBar = ({ now }) => html`
-      <div class="topbar">
-        <div class="brand">
-          <span class="brand-dot"><${BellIcon} /></span>
-          Alarm
+    const TopBar = () => {
+      const [who, setWho] = useState((window.xlogin && window.xlogin.id) || null);
+
+      useEffect(() => {
+        const sync = () => setWho((window.xlogin && window.xlogin.id) || null);
+        document.addEventListener('xlogin', sync);
+        document.addEventListener('xlogout', sync);
+        return () => {
+          document.removeEventListener('xlogin', sync);
+          document.removeEventListener('xlogout', sync);
+        };
+      }, []);
+
+      const label = who
+        ? (() => { try { return new URL(who).hostname; } catch { return 'Sign out'; } })()
+        : 'Login';
+
+      return html`
+        <div class="topbar">
+          <div class="brand">
+            <span class="brand-dot"><${BellIcon} /></span>
+            Alarm
+          </div>
+          <button
+            type="button"
+            class="btn-auth"
+            title=${who ? `Signed in as ${who} — click to sign out` : 'Sign in with Solid'}
+            onClick=${() => {
+              if (!window.xlogin) return;
+              if (who) window.xlogin.logout && window.xlogin.logout();
+              else window.xlogin.login && window.xlogin.login();
+            }}
+          >${label}</button>
         </div>
-        <div class="topbar-date">
-          ${now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-        </div>
-      </div>
-    `;
+      `;
+    };
 
     // Minutes from `now` until the next firing of an enabled alarm, or null.
     const nextAlarmIn = (alarms, now) => {
@@ -1585,14 +1794,22 @@
       })();
 
       return html`
-        <${TopBar} now=${now} />
         <div class="hero">
-          <div class="clock">
-            ${pad(h12)}:${pad(now.getMinutes())}<span class="sec">:${pad(now.getSeconds())}</span>
+          <div class="hero-date">
+            ${now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
           </div>
-          ${chip
-            ? html`<span class="next-chip"><${BellIcon} />${chip}</span>`
-            : html`<span class="next-chip none">No alarms set</span>`}
+          <div class="clock">
+            ${h12}<span class="colon">:</span>${pad(now.getMinutes())}<span class="clock-side"><span class="mer">${now.getHours() >= 12 ? 'PM' : 'AM'}</span><span class="sec">${pad(now.getSeconds())}</span></span>
+          </div>
+          <div class="chip-row">
+            ${(() => {
+              const live = alarms.find(a => a.ringing);
+              if (live) return html`<span class="next-chip alarm-live"><${BellIcon} />Ringing — ${live.label || TimeParser.toDisplay(live.time)}</span>`;
+              return chip
+                ? html`<span class="next-chip"><${BellIcon} />${chip}</span>`
+                : html`<span class="next-chip none">No alarms set</span>`;
+            })()}
+          </div>
         </div>
       `;
     };
@@ -1609,6 +1826,7 @@
         <div class="notification-prompt">
           <p>Enable notifications to receive alarm alerts</p>
           <button type="button" class="btn-enable" onClick=${handleClick}>Enable</button>
+          <button type="button" class="btn-close" aria-label="Dismiss" onClick=${onDone}>✕</button>
         </div>
       `;
     };
@@ -1812,28 +2030,27 @@
       `;
     };
 
-    const AlarmItem = ({ alarm, onToggle, onDelete, onDismiss }) => {
+    const AlarmItem = ({ alarm, onToggle, onDelete, onDismiss, onSnooze }) => {
       const display = TimeParser.toDisplay(alarm.time);
       const [main, ap] = display.split(' ');
+      const snoozed = !alarm.ringing && alarm.snoozeUntil && alarm.snoozeUntil > Date.now();
+      const meta = snoozed
+        ? `Snoozed · rings ${new Date(alarm.snoozeUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+        : (alarm.label || 'Alarm');
 
       return html`
         <div class=${`alarm ${alarm.ringing ? 'ringing' : alarm.enabled ? '' : 'off'}`}>
           <div class="alarm-body">
             <div class="alarm-time">${main}<span class="ap">${ap}</span></div>
-            <div class="alarm-meta" title=${alarm.label || 'Alarm'}>${alarm.label || 'Alarm'}</div>
+            <div class="alarm-meta" title=${alarm.label || 'Alarm'}>${meta}</div>
           </div>
           <div class="alarm-actions">
             ${alarm.ringing ? html`
-              <button type="button" class="btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
-                Dismiss
+              <button type="button" class="btn-snooze" onClick=${() => onSnooze(alarm.id)}>
+                Snooze
               </button>
-              <button
-                type="button"
-                class="btn-del"
-                aria-label="Delete alarm ${display}"
-                onClick=${() => onDelete(alarm.id)}
-              >
-                <${DeleteIcon} />
+              <button type="button" class="btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
+                Stop
               </button>
             ` : html`
               <label class="switch">
@@ -1863,7 +2080,10 @@
       <div class="empty">
         <${BellIcon} />
         <p>No alarms yet</p>
-        <p>Add your first one above</p>
+        <p>
+          <span class="when-mobile">Add your first one above</span>
+          <span class="when-desktop">Set one with the form on the left</span>
+        </p>
       </div>
     `;
 
@@ -1885,6 +2105,12 @@
         };
       }, []);
 
+      // Page-level urgency cue: everything that isn't the ringing alarm
+      // quiets down while one is firing.
+      useEffect(() => {
+        document.body.classList.toggle('is-ringing', alarms.some(a => a.ringing));
+      }, [alarms]);
+
       const handleAddAlarm = useCallback((time, label) => {
         alarmService.addAlarm(time, label);
         toast(`Alarm set for ${TimeParser.toDisplay(time)}`);
@@ -1902,18 +2128,25 @@
         alarmService.dismissAlarm(id);
       }, []);
 
+      const handleSnooze = useCallback((id) => {
+        alarmService.snoozeAlarm(id);
+      }, []);
+
       const sortedAlarms = [...alarms].sort((a, b) => a.time.localeCompare(b.time));
 
       return html`
         <div class="wrap">
-          <${HeroClock} alarms=${alarms} />
+          <${TopBar} />
+          <div class="col-main">
+            <${HeroClock} alarms=${alarms} />
 
-          ${showNotificationPrompt && html`
-            <${NotificationPrompt} onDone=${() => setShowNotificationPrompt(false)} />
-          `}
+            ${showNotificationPrompt && html`
+              <${NotificationPrompt} onDone=${() => setShowNotificationPrompt(false)} />
+            `}
 
-          <${AlarmForm} onAdd=${handleAddAlarm} />
-
+            <${AlarmForm} onAdd=${handleAddAlarm} />
+          </div>
+          <div class="col-list">
           <div class="section-label">Your alarms</div>
           <div class="alarm-list">
             ${sortedAlarms.length === 0
@@ -1925,9 +2158,11 @@
                     onToggle=${handleToggle}
                     onDelete=${handleDelete}
                     onDismiss=${handleDismiss}
+                    onSnooze=${handleSnooze}
                   />
                 `)
             }
+          </div>
           </div>
         </div>
       `;
