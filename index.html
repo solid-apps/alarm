@@ -195,10 +195,13 @@
       .when-mobile { display: none; }
     }
 
-    /* xlogin's floating pill renders in a closed shadow root (unstyleable,
-     * off-palette, off-grid). Hide it; the topbar renders its own auth
-     * button wired to window.xlogin.login()/logout(). */
-    #xlogin-widget { display: none !important; }
+    /* xlogin renders BOTH its floating pill AND its login modal into one
+     * closed-shadow host, so hiding the host outright would hide the modal
+     * too (that bug shipped briefly — Login clicked, nothing appeared).
+     * Instead: hidden by default, shown only while the modal is in use;
+     * the topbar's own auth button drives window.xlogin.login()/logout(). */
+    #xlogin-widget { display: none; }
+    body.xl-open #xlogin-widget { display: block; }
 
     .btn-auth {
       background: transparent;
@@ -1698,6 +1701,20 @@
     });
     document.addEventListener('xlogout', () => onSolidSignOut());
 
+    // Re-hide the xlogin shadow host once its modal is done. While the
+    // modal is open its overlay covers the viewport, so every click
+    // retargets to the host — a click on anything else proves the modal
+    // has closed (cancelled or completed).
+    const hideXlogin = () => document.body.classList.remove('xl-open');
+    document.addEventListener('xlogin', hideXlogin);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideXlogin(); });
+    document.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('xl-open')) return;
+      const t = e.target;
+      if (t && (t.id === 'xlogin-widget' || (t.closest && t.closest('.btn-auth')))) return;
+      hideXlogin();
+    }, true);
+
     // xlogin may have already restored a session before this handler
     // attached — pick that up too.
     if (window.xlogin && window.xlogin.type === 'solid' && window.xlogin.id) {
@@ -1755,8 +1772,13 @@
             title=${who ? `Signed in as ${who} — click to sign out` : 'Sign in with Solid'}
             onClick=${() => {
               if (!window.xlogin) return;
-              if (who) window.xlogin.logout && window.xlogin.logout();
-              else window.xlogin.login && window.xlogin.login();
+              if (who) {
+                window.xlogin.logout && window.xlogin.logout();
+              } else {
+                // Reveal the shadow host so the modal is visible, then open it.
+                document.body.classList.add('xl-open');
+                window.xlogin.login && window.xlogin.login();
+              }
             }}
           >${label}</button>
         </div>
