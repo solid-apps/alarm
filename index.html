@@ -691,6 +691,9 @@
     .btn-del:hover { color: var(--danger); background: rgba(225, 29, 72, 0.08); }
     .btn-del:active { transform: scale(0.94); }
     .btn-del svg { width: 18px; height: 18px; }
+    /* On the ringing card the dim gray would vanish against the green. */
+    .alarm.ringing .btn-del { color: rgba(255, 255, 255, 0.8); }
+    .alarm.ringing .btn-del:hover { color: #fff; background: rgba(255, 255, 255, 0.18); }
 
     /* ---------- Empty state (anchored placeholder card) ---------- */
     .empty {
@@ -1188,10 +1191,12 @@
         // The pod doc is an ical:Vcalendar of ical:Vevent components — the
         // same shape (and aliased-context style) the sibling calendar and
         // tasks apps use, so any Vcalendar-aware tool can read alarms as
-        // what they are. Each alarm is a daily-recurring Vevent:
+        // what they are. Each alarm is a Vevent:
         //   time    -> dtstart (floating time — RFC 5545's "8am wherever
         //              you are" semantics, which is what an alarm wants)
-        //   (daily) -> rrule FREQ=DAILY (weekday schedules later = BYDAY)
+        //   (daily) -> rrule FREQ=DAILY (weekday schedules later = BYDAY);
+        //              a one-shot (quick) alarm simply has NO rrule, which
+        //              is exactly what a non-recurring Vevent means
         //   label   -> summary
         //   enabled -> status CONFIRMED / CANCELLED (a calendar hiding
         //              CANCELLED events treats a disabled alarm correctly)
@@ -1237,13 +1242,13 @@
             '@id': '#alarm-' + a.id,
             '@type': ['Vevent', 'urn:solid:Alarm'],
             dtstart: (a.createdAt || new Date().toISOString()).slice(0, 10) + 'T' + a.time,
-            rrule: 'FREQ=DAILY',
             status: a.enabled ? 'CONFIRMED' : 'CANCELLED',
             // RFC 5545: an AUDIO alarm names its sound via ATTACH. The urn
             // keeps the value a proper IRI while staying asset-free.
             valarm: { '@type': 'Valarm', action: 'AUDIO', trigger: 'PT0S',
                       attach: 'urn:solid:sound:' + (AlarmTones[a.sound] ? a.sound : DEFAULT_TONE) }
           };
+          if (!a.oneShot) comp.rrule = 'FREQ=DAILY';
           if (a.label) comp.summary = a.label;
           if (a.createdAt) comp.created = a.createdAt;
           return comp;
@@ -1256,6 +1261,7 @@
           const sound = attach.startsWith('urn:solid:sound:') ? attach.slice(16) : DEFAULT_TONE;
           return {
             sound: AlarmTones[sound] ? sound : DEFAULT_TONE,
+            oneShot: !c.rrule,
             id: frag.startsWith('#alarm-') ? frag.slice(7)
               : (frag.replace(/^#/, '') || Date.now().toString()),
             time: /^\d\d:\d\d$/.test(time) ? time : '00:00',
@@ -1694,6 +1700,10 @@
           const alarm = alarms.find(a => a.id === id);
           if (!alarm) return;
 
+          // A one-shot (quick) alarm is done once stopped — remove it
+          // rather than leaving a daily repeat behind.
+          if (alarm.oneShot) return this.removeAlarm(id);
+
           alarm.ringing = false;
           delete alarm.snoozeUntil;
           closeNotification(id);
@@ -1718,12 +1728,13 @@
           notify();
         },
 
-        async addAlarm(time, label = '', sound = DEFAULT_TONE) {
+        async addAlarm(time, label = '', sound = DEFAULT_TONE, oneShot = false) {
           const newAlarm = {
             id: Date.now().toString(),
             time,
             label,
             sound,
+            oneShot: !!oneShot,
             enabled: true,
             ringing: false,
             createdAt: new Date().toISOString()
@@ -2129,7 +2140,8 @@
         const now = new Date();
         now.setMinutes(now.getMinutes() + minutes);
         const time = TimeParser.format(now.getHours(), now.getMinutes());
-        onAdd(time, label || `In ${minutes} min`, sound);
+        // Quick alarms are one-shot timers — they delete themselves on Stop.
+        onAdd(time, label || `In ${minutes} min`, sound, true);
         setLabel('');
       };
 
@@ -2251,7 +2263,7 @@
         ? ` · ${AlarmTones[alarm.sound].label}` : '';
       const meta = snoozed
         ? `Snoozed · rings ${new Date(alarm.snoozeUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-        : (alarm.label || 'Alarm') + toneTag;
+        : (alarm.label || 'Alarm') + toneTag + (alarm.oneShot ? ' · once' : '');
 
       return html`
         <div class=${`alarm ${alarm.ringing ? 'ringing' : alarm.enabled ? '' : 'off'}`}>
@@ -2266,6 +2278,14 @@
               </button>
               <button type="button" class="btn-dismiss" onClick=${() => onDismiss(alarm.id)}>
                 Stop
+              </button>
+              <button
+                type="button"
+                class="btn-del"
+                aria-label="Delete alarm ${display}"
+                onClick=${() => onDelete(alarm.id)}
+              >
+                <${DeleteIcon} />
               </button>
             ` : html`
               <label class="switch">
@@ -2326,8 +2346,8 @@
         document.body.classList.toggle('is-ringing', alarms.some(a => a.ringing));
       }, [alarms]);
 
-      const handleAddAlarm = useCallback((time, label, sound) => {
-        alarmService.addAlarm(time, label, sound);
+      const handleAddAlarm = useCallback((time, label, sound, oneShot) => {
+        alarmService.addAlarm(time, label, sound, oneShot);
         toast(`Alarm set for ${TimeParser.toDisplay(time)}`);
       }, []);
 
