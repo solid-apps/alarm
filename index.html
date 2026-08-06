@@ -1485,6 +1485,27 @@
           });
         }
       },
+      gentle: {
+        label: 'Gentle', cycle: 4.5,
+        schedule(ctx, out, t) {
+          // Very soft and soothing: a low F-major triad, feather attack,
+          // long tails, and generous silence between cycles. Each note is a
+          // sine fundamental plus a whisper of its octave for warmth; peaks
+          // sit well below every other tone.
+          [349.23, 440, 523.25].forEach((f, i) => {
+            const st = t + i * 0.9;
+            [[f, 0.11], [f * 2, 0.025]].forEach(([freq, v]) => {
+              const o = ctx.createOscillator(), g = ctx.createGain();
+              o.type = 'sine'; o.frequency.value = freq;
+              g.gain.setValueAtTime(0.0001, st);
+              g.gain.linearRampToValueAtTime(v, st + 0.12);
+              g.gain.exponentialRampToValueAtTime(0.001, st + 1.8);
+              o.connect(g); g.connect(out);
+              o.start(st); o.stop(st + 1.85);
+            });
+          });
+        }
+      },
       digital: {
         label: 'Digital', cycle: 1.0,
         schedule(ctx, out, t) {
