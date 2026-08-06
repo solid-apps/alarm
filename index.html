@@ -1068,10 +1068,9 @@
       },
 
       // Solid Backend — stores alarms as JSON-LD on the user's pod.
-      // PoC layout: /public/alarm/alarms.jsonld with public read+write ACL
-      // so the same pattern as the PDF reader's remote-control state doc
-      // works (curl can add/remove an alarm, etc.). For sensitive use the
-      // ACL can be tightened to owner-only later.
+      // Layout: /public/alarm/alarms.jsonld with an owner-only ACL (alarms
+      // are private user data). Every request that touches the doc must go
+      // through xlogin.authFetch — an anonymous fetch gets a 401.
       solid: {
         name: 'solid',
         docUrl: null,      // resolved on first call from xlogin's WebID
@@ -1636,8 +1635,10 @@
       closeSolidWs();
       const url = await StorageBackends.solid.resolveDoc();
       if (!url) return;
+      // authFetch, not fetch: the doc's ACL is owner-only, so an anonymous
+      // request 401s and never exposes the updates-via header.
       let r;
-      try { r = await fetch(url); } catch { return; }
+      try { r = await window.xlogin.authFetch(url, { method: 'HEAD' }); } catch { return; }
       const wsUrl = r.headers.get('updates-via');
       if (!wsUrl) return;
       const connect = () => {
@@ -1672,7 +1673,11 @@
         return;
       }
       if (pod.length) return; // pod has data; don't clobber
-      await StorageBackends.solid.save('alarms', local);
+      const saved = await StorageBackends.solid.save('alarms', local);
+      if (!saved) {
+        console.error('migration failed: could not write alarms to pod');
+        return;
+      }
       console.log(`migrated ${local.length} alarms from localStorage to pod`);
     }
 
