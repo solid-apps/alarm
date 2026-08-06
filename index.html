@@ -489,6 +489,49 @@
       box-shadow: 0 0 0 3px var(--accent-soft);
     }
 
+    .sound-row { display: flex; gap: 10px; }
+    .sound-input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 32px 12px 14px;
+      appearance: none;
+      -webkit-appearance: none;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2394a3b8' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.9375rem;
+      cursor: pointer;
+    }
+    .sound-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .btn-preview {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--bg-soft);
+      color: #64748b;
+      font-family: var(--font);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-preview:hover { color: var(--accent); border-color: var(--accent); }
+    .btn-preview:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
     .btn-set {
       padding: 14px;
       border: none;
@@ -1164,7 +1207,8 @@
             summary: 'ical:summary', dtstart: 'ical:dtstart', rrule: 'ical:rrule',
             status: 'ical:status', created: 'dct:created', modified: 'dct:modified',
             component: 'ical:component', valarm: 'ical:valarm',
-            action: 'ical:action', trigger: 'ical:trigger', name: 'dct:title',
+            action: 'ical:action', trigger: 'ical:trigger', attach: 'ical:attach',
+            name: 'dct:title',
             Vcalendar: 'ical:Vcalendar', Vevent: 'ical:Vevent', Valarm: 'ical:Valarm'
           };
         },
@@ -1195,7 +1239,10 @@
             dtstart: (a.createdAt || new Date().toISOString()).slice(0, 10) + 'T' + a.time,
             rrule: 'FREQ=DAILY',
             status: a.enabled ? 'CONFIRMED' : 'CANCELLED',
-            valarm: { '@type': 'Valarm', action: 'AUDIO', trigger: 'PT0S' }
+            // RFC 5545: an AUDIO alarm names its sound via ATTACH. The urn
+            // keeps the value a proper IRI while staying asset-free.
+            valarm: { '@type': 'Valarm', action: 'AUDIO', trigger: 'PT0S',
+                      attach: 'urn:solid:sound:' + (AlarmTones[a.sound] ? a.sound : 'beep') }
           };
           if (a.label) comp.summary = a.label;
           if (a.createdAt) comp.created = a.createdAt;
@@ -1205,7 +1252,10 @@
         _fromComponent(c) {
           const frag = String(c['@id'] || '');
           const time = String(c.dtstart || '').slice(11, 16);
+          const attach = String((c.valarm && c.valarm.attach) || '');
+          const sound = attach.startsWith('urn:solid:sound:') ? attach.slice(16) : 'beep';
           return {
+            sound: AlarmTones[sound] ? sound : 'beep',
             id: frag.startsWith('#alarm-') ? frag.slice(7)
               : (frag.replace(/^#/, '') || Date.now().toString()),
             time: /^\d\d:\d\d$/.test(time) ? time : '00:00',
@@ -1372,11 +1422,96 @@
     // ============================================
     // AUDIO SERVICE
     // ============================================
+    // Alarm tones are synthesized with Web Audio (no assets — the app stays
+    // one self-contained file). Each tone's schedule() writes ONE cycle of
+    // sound at absolute context time t through `out`; the service repeats it
+    // every `cycle` seconds. All nodes are short-lived and self-stop, so
+    // silencing is just disconnecting the master gain.
+    // 'beep' is the historical sound and the default for alarms that don't
+    // carry a sound (pre-feature docs, legacy localStorage).
+
+    const AlarmTones = {
+      beep: {
+        label: 'Beep', cycle: 0.5,
+        schedule(ctx, out, t) {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = 800;
+          g.gain.setValueAtTime(0.3, t);
+          g.gain.setValueAtTime(0, t + 0.2);
+          o.connect(g); g.connect(out);
+          o.start(t); o.stop(t + 0.25);
+        }
+      },
+      bell: {
+        label: 'Bell', cycle: 1.1,
+        schedule(ctx, out, t) {
+          // Wind-up clock: a burst of quick strikes, each a bright pair of
+          // inharmonic partials with a fast exponential decay.
+          for (let i = 0; i < 8; i++) {
+            const st = t + i * 0.08;
+            [[1568, 0.25], [2360, 0.12]].forEach(([f, v]) => {
+              const o = ctx.createOscillator(), g = ctx.createGain();
+              o.type = 'sine'; o.frequency.value = f;
+              g.gain.setValueAtTime(v, st);
+              g.gain.exponentialRampToValueAtTime(0.001, st + 0.07);
+              o.connect(g); g.connect(out);
+              o.start(st); o.stop(st + 0.08);
+            });
+          }
+        }
+      },
+      chime: {
+        label: 'Chime', cycle: 2.0,
+        schedule(ctx, out, t) {
+          // Gentle rising C-major arpeggio, soft attack so it never startles.
+          [523.25, 659.25, 783.99].forEach((f, i) => {
+            const st = t + i * 0.4;
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = f;
+            g.gain.setValueAtTime(0.0001, st);
+            g.gain.linearRampToValueAtTime(0.28, st + 0.04);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.6);
+            o.connect(g); g.connect(out);
+            o.start(st); o.stop(st + 0.65);
+          });
+        }
+      },
+      digital: {
+        label: 'Digital', cycle: 1.0,
+        schedule(ctx, out, t) {
+          // Digital-watch triple beep. Square wave is harsh, so run it quiet.
+          for (let i = 0; i < 3; i++) {
+            const st = t + i * 0.15;
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'square'; o.frequency.value = 1046.5;
+            g.gain.setValueAtTime(0.12, st);
+            g.gain.setValueAtTime(0, st + 0.07);
+            o.connect(g); g.connect(out);
+            o.start(st); o.stop(st + 0.1);
+          }
+        }
+      },
+      siren: {
+        label: 'Siren', cycle: 1.0,
+        schedule(ctx, out, t) {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(600, t);
+          o.frequency.linearRampToValueAtTime(1100, t + 0.45);
+          o.frequency.linearRampToValueAtTime(600, t + 0.9);
+          g.gain.setValueAtTime(0.25, t);
+          g.gain.setValueAtTime(0, t + 0.9);
+          o.connect(g); g.connect(out);
+          o.start(t); o.stop(t + 0.95);
+        }
+      }
+    };
 
     const AudioService = {
       audioContext: null,
-      oscillator: null,
-      gainNode: null,
+      masterGain: null,    // per-ring output node; disconnecting silences everything
+      cycleInterval: null,
+      previewTimer: null,
 
       init() {
         if (!this.audioContext) {
@@ -1384,47 +1519,53 @@
         }
       },
 
-      play() {
+      play(tone) {
         this.init();
         // The context is created from a timer (no user gesture), so Chrome
-        // starts it suspended and the beep would be silent without a resume.
+        // starts it suspended and the sound would be silent without a resume.
         if (this.audioContext.state === 'suspended') {
           this.audioContext.resume().catch(() => {});
         }
-        if (this.oscillator) this.stop();
+        this.stop();
 
-        this.oscillator = this.audioContext.createOscillator();
-        this.gainNode = this.audioContext.createGain();
+        const def = AlarmTones[tone] || AlarmTones.beep;
+        const ctx = this.audioContext;
+        const out = ctx.createGain();
+        out.connect(ctx.destination);
+        this.masterGain = out;
 
-        this.oscillator.connect(this.gainNode);
-        this.gainNode.connect(this.audioContext.destination);
-
-        this.oscillator.frequency.value = 800;
-        this.oscillator.type = 'sine';
-        this.gainNode.gain.value = 0.3;
-
-        this.oscillator.start();
-
-        // Beeping pattern
-        const beep = () => {
-          if (!this.oscillator) return;
-          this.gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-          this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime + 0.2);
+        // Guard on identity, not just existence: a stale interval firing
+        // after stop()/play() must not schedule into the new session.
+        const runCycle = () => {
+          if (this.masterGain === out) def.schedule(ctx, out, ctx.currentTime);
         };
-
-        this.beepInterval = setInterval(beep, 500);
-        beep();
+        this.cycleInterval = setInterval(runCycle, def.cycle * 1000);
+        runCycle();
       },
 
       stop() {
-        if (this.oscillator) {
-          this.oscillator.stop();
-          this.oscillator = null;
+        if (this.previewTimer) {
+          clearTimeout(this.previewTimer);
+          this.previewTimer = null;
         }
-        if (this.beepInterval) {
-          clearInterval(this.beepInterval);
-          this.beepInterval = null;
+        if (this.cycleInterval) {
+          clearInterval(this.cycleInterval);
+          this.cycleInterval = null;
         }
+        if (this.masterGain) {
+          try { this.masterGain.disconnect(); } catch {}
+          this.masterGain = null;
+        }
+      },
+
+      // One cycle of a tone for the composer's picker. Never runs while a
+      // real alarm is ringing (the ring owns the audio session, and the
+      // body class is how the app already tracks that state).
+      preview(tone) {
+        if (document.body.classList.contains('is-ringing')) return;
+        this.play(tone);
+        const def = AlarmTones[tone] || AlarmTones.beep;
+        this.previewTimer = setTimeout(() => this.stop(), def.cycle * 1000 + 400);
       }
     };
 
@@ -1524,7 +1665,7 @@
           alarm.ringing = true;
           notify();
 
-          AudioService.play();
+          AudioService.play(alarm.sound);
           NotificationService.notify('Alarm!', {
             body: alarm.label || alarm.time,
             tag: `alarm-${id}`
@@ -1557,11 +1698,12 @@
           notify();
         },
 
-        async addAlarm(time, label = '') {
+        async addAlarm(time, label = '', sound = 'beep') {
           const newAlarm = {
             id: Date.now().toString(),
             time,
             label,
+            sound,
             enabled: true,
             ringing: false,
             createdAt: new Date().toISOString()
@@ -1960,12 +2102,13 @@
       const [hour, setHour] = useState(8);
       const [minute, setMinute] = useState(0);
       const [period, setPeriod] = useState('AM');
+      const [sound, setSound] = useState('beep');
 
       const addInMinutes = (minutes) => {
         const now = new Date();
         now.setMinutes(now.getMinutes() + minutes);
         const time = TimeParser.format(now.getHours(), now.getMinutes());
-        onAdd(time, label || `In ${minutes} min`);
+        onAdd(time, label || `In ${minutes} min`, sound);
         setLabel('');
       };
 
@@ -1974,7 +2117,7 @@
         if (period === 'PM' && h !== 12) h += 12;
         if (period === 'AM' && h === 12) h = 0;
         const time = TimeParser.format(h, minute);
-        onAdd(time, label);
+        onAdd(time, label, sound);
         setLabel('');
       };
 
@@ -2050,6 +2193,27 @@
             placeholder="Label — Wake up, Meeting…"
           />
 
+          <div class="sound-row">
+            <select
+              class="sound-input"
+              aria-label="Alarm sound"
+              value=${sound}
+              onChange=${(e) => setSound(e.target.value)}
+            >
+              ${Object.entries(AlarmTones).map(([key, t]) => html`
+                <option value=${key}>${t.label}</option>
+              `)}
+            </select>
+            <button
+              type="button"
+              class="btn-preview"
+              onClick=${() => AudioService.preview(sound)}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.5 4.5 5.5H2v5h2.5L8 13.5v-11Z" fill="currentColor"/><path d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6 6 0 0 1 0 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              Preview
+            </button>
+          </div>
+
           <button type="button" class="btn-set" onClick=${addAtTime}>
             Set alarm
           </button>
@@ -2061,9 +2225,12 @@
       const display = TimeParser.toDisplay(alarm.time);
       const [main, ap] = display.split(' ');
       const snoozed = !alarm.ringing && alarm.snoozeUntil && alarm.snoozeUntil > Date.now();
+      // Surface a non-default tone so the list confirms what will ring.
+      const toneTag = alarm.sound && alarm.sound !== 'beep' && AlarmTones[alarm.sound]
+        ? ` · ${AlarmTones[alarm.sound].label}` : '';
       const meta = snoozed
         ? `Snoozed · rings ${new Date(alarm.snoozeUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-        : (alarm.label || 'Alarm');
+        : (alarm.label || 'Alarm') + toneTag;
 
       return html`
         <div class=${`alarm ${alarm.ringing ? 'ringing' : alarm.enabled ? '' : 'off'}`}>
@@ -2138,8 +2305,8 @@
         document.body.classList.toggle('is-ringing', alarms.some(a => a.ringing));
       }, [alarms]);
 
-      const handleAddAlarm = useCallback((time, label) => {
-        alarmService.addAlarm(time, label);
+      const handleAddAlarm = useCallback((time, label, sound) => {
+        alarmService.addAlarm(time, label, sound);
         toast(`Alarm set for ${TimeParser.toDisplay(time)}`);
       }, []);
 
