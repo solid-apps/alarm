@@ -1578,6 +1578,20 @@
       let listeners = [];
       let checkInterval = null;
       const lastFiredMinute = new Map(); // alarm.id -> minute epoch it last fired
+      // alarm.id -> OS Notification shown for the current ring. Kept so
+      // Stop/Snooze/Delete can close it — requireInteraction notifications
+      // otherwise sit in the OS shade until dismissed by hand. A page can
+      // only close notifications it created, so each tab manages its own
+      // (the shared tag prevents cross-tab duplicates).
+      const activeNotifications = new Map();
+
+      const closeNotification = (id) => {
+        const n = activeNotifications.get(id);
+        if (n) {
+          try { n.close(); } catch {}
+          activeNotifications.delete(id);
+        }
+      };
 
       const notify = () => listeners.forEach(fn => fn([...alarms]));
 
@@ -1666,10 +1680,11 @@
           notify();
 
           AudioService.play(alarm.sound);
-          NotificationService.notify('Alarm!', {
+          const n = NotificationService.notify('Alarm!', {
             body: alarm.label || alarm.time,
             tag: `alarm-${id}`
           });
+          if (n) activeNotifications.set(id, n);
         },
 
         async dismissAlarm(id) {
@@ -1678,6 +1693,7 @@
 
           alarm.ringing = false;
           delete alarm.snoozeUntil;
+          closeNotification(id);
           // Keep enabled so it rings again tomorrow.
           // Only silence the beep if no other alarm is still ringing.
           if (!alarms.some(a => a.ringing)) AudioService.stop();
@@ -1692,6 +1708,7 @@
 
           alarm.ringing = false;
           alarm.snoozeUntil = Date.now() + minutes * 60000;
+          closeNotification(id);
           if (!alarms.some(a => a.ringing)) AudioService.stop();
 
           await storageService.saveAlarms(alarms);
@@ -1718,6 +1735,7 @@
         async removeAlarm(id) {
           const alarm = alarms.find(a => a.id === id);
           alarms = alarms.filter(a => a.id !== id);
+          closeNotification(id);
           if (alarm?.ringing && !alarms.some(a => a.ringing)) AudioService.stop();
           await storageService.saveAlarms(alarms);
           notify();
