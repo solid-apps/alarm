@@ -1242,7 +1242,7 @@
             // RFC 5545: an AUDIO alarm names its sound via ATTACH. The urn
             // keeps the value a proper IRI while staying asset-free.
             valarm: { '@type': 'Valarm', action: 'AUDIO', trigger: 'PT0S',
-                      attach: 'urn:solid:sound:' + (AlarmTones[a.sound] ? a.sound : 'beep') }
+                      attach: 'urn:solid:sound:' + (AlarmTones[a.sound] ? a.sound : DEFAULT_TONE) }
           };
           if (a.label) comp.summary = a.label;
           if (a.createdAt) comp.created = a.createdAt;
@@ -1253,9 +1253,9 @@
           const frag = String(c['@id'] || '');
           const time = String(c.dtstart || '').slice(11, 16);
           const attach = String((c.valarm && c.valarm.attach) || '');
-          const sound = attach.startsWith('urn:solid:sound:') ? attach.slice(16) : 'beep';
+          const sound = attach.startsWith('urn:solid:sound:') ? attach.slice(16) : DEFAULT_TONE;
           return {
-            sound: AlarmTones[sound] ? sound : 'beep',
+            sound: AlarmTones[sound] ? sound : DEFAULT_TONE,
             id: frag.startsWith('#alarm-') ? frag.slice(7)
               : (frag.replace(/^#/, '') || Date.now().toString()),
             time: /^\d\d:\d\d$/.test(time) ? time : '00:00',
@@ -1427,8 +1427,11 @@
     // sound at absolute context time t through `out`; the service repeats it
     // every `cycle` seconds. All nodes are short-lived and self-stop, so
     // silencing is just disconnecting the master gain.
-    // 'beep' is the historical sound and the default for alarms that don't
-    // carry a sound (pre-feature docs, legacy localStorage).
+    // DEFAULT_TONE is what rings for alarms that don't carry a sound
+    // (pre-feature docs, legacy localStorage) and what the picker offers
+    // first. 'beep' is the historical sound.
+
+    const DEFAULT_TONE = 'chime';
 
     const AlarmTones = {
       beep: {
@@ -1528,7 +1531,7 @@
         }
         this.stop();
 
-        const def = AlarmTones[tone] || AlarmTones.beep;
+        const def = AlarmTones[tone] || AlarmTones[DEFAULT_TONE];
         const ctx = this.audioContext;
         const out = ctx.createGain();
         out.connect(ctx.destination);
@@ -1564,7 +1567,7 @@
       preview(tone) {
         if (document.body.classList.contains('is-ringing')) return;
         this.play(tone);
-        const def = AlarmTones[tone] || AlarmTones.beep;
+        const def = AlarmTones[tone] || AlarmTones[DEFAULT_TONE];
         this.previewTimer = setTimeout(() => this.stop(), def.cycle * 1000 + 400);
       }
     };
@@ -1715,7 +1718,7 @@
           notify();
         },
 
-        async addAlarm(time, label = '', sound = 'beep') {
+        async addAlarm(time, label = '', sound = DEFAULT_TONE) {
           const newAlarm = {
             id: Date.now().toString(),
             time,
@@ -2120,7 +2123,7 @@
       const [hour, setHour] = useState(8);
       const [minute, setMinute] = useState(0);
       const [period, setPeriod] = useState('AM');
-      const [sound, setSound] = useState('beep');
+      const [sound, setSound] = useState(DEFAULT_TONE);
 
       const addInMinutes = (minutes) => {
         const now = new Date();
@@ -2244,7 +2247,7 @@
       const [main, ap] = display.split(' ');
       const snoozed = !alarm.ringing && alarm.snoozeUntil && alarm.snoozeUntil > Date.now();
       // Surface a non-default tone so the list confirms what will ring.
-      const toneTag = alarm.sound && alarm.sound !== 'beep' && AlarmTones[alarm.sound]
+      const toneTag = alarm.sound && alarm.sound !== DEFAULT_TONE && AlarmTones[alarm.sound]
         ? ` · ${AlarmTones[alarm.sound].label}` : '';
       const meta = snoozed
         ? `Snoozed · rings ${new Date(alarm.snoozeUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
